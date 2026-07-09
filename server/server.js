@@ -91,15 +91,20 @@ app.post('/api/alerts', async (req, res) => {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   if (db) {
     try {
+      // Single-field query to avoid composite index requirements
       const existingAlerts = await db.collection('alerts')
-        .where('kid_name', '==', kid_name)
         .where('target_text', '==', target_text)
-        .where('timestamp', '>', fiveMinutesAgo)
-        .limit(1)
         .get();
       
-      if (!existingAlerts.empty) {
-        const duplicateDoc = existingAlerts.docs[0];
+      const duplicateDoc = existingAlerts.docs.find(doc => {
+        const data = doc.data();
+        const alertTime = data.timestamp && typeof data.timestamp.toDate === 'function'
+          ? data.timestamp.toDate()
+          : new Date(data.timestamp);
+        return data.kid_name === kid_name && alertTime > fiveMinutesAgo;
+      });
+
+      if (duplicateDoc) {
         console.log(`Duplicate alert detected for ${kid_name}: "${target_text}". Extending block window by 5 minutes.`);
         await duplicateDoc.ref.update({
           timestamp: admin.firestore.FieldValue.serverTimestamp()
