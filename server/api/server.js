@@ -7,14 +7,14 @@ const { analyzeHebrewText } = require('./hebrew_analysis');
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Port
 const PORT = process.env.PORT || 3000;
 
 // Initialize Firebase Admin
 let db = null;
-const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+const serviceAccountPath = path.join(__dirname, '..', 'firebase-service-account.json');
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
@@ -299,7 +299,7 @@ app.post('/api/config/keywords/reset', async (req, res) => {
 
 // Serve the Dashboard dashboard page
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
 if (process.env.NODE_ENV !== 'production') {
