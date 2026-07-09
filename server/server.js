@@ -51,6 +51,7 @@ const DEFAULT_KEYWORDS = [...mockKeywords];
 
 // API: Receive a flagged message from kid's phone
 app.post('/api/alerts', async (req, res) => {
+  console.log("Incoming alert request:", req.body);
   const { kid_name, target_text, context } = req.body;
   
   if (!kid_name || !target_text) {
