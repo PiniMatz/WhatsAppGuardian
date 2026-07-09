@@ -92,6 +92,8 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         findMessageBubbleNodes(rootNode, messageNodes)
 
         val keywords = AlertSender.getKeywords(applicationContext)
+        val sharedPrefs = applicationContext.getSharedPreferences("GuardianPrefs", android.content.Context.MODE_PRIVATE)
+        val kidName = sharedPrefs.getString("kid_name", "הילד") ?: "הילד"
 
         for (node in messageNodes) {
             val text = node.text?.toString()?.trim() ?: continue
@@ -100,13 +102,8 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             // Heuristic to ignore timestamp texts (e.g., "11:34", "11:34 AM", "אתמול")
             if (isMetadataOrTime(text)) continue
 
-            // Determine if the message is incoming or outgoing based on screen position
-            val bounds = Rect()
-            node.getBoundsInScreen(bounds)
-            // Typically in RTL (Hebrew system layout), outgoing messages are on the left, incoming on the right.
-            // Let's deduce the sender as "Kid" if it is aligned to the outgoing side (normally left in RTL, right in LTR).
-            // Rather than risking layout flip issues, we label based on layout boundaries or simple name tags.
-            val sender = if (bounds.left < 200) "הילד" else "צד_שני"
+            // Dynamic Sender Name extraction (from group bubble header, or fallback to contact/kid name)
+            val sender = getSenderName(node, activeChatTitle, kidName)
 
             val messageKey = "${activeChatTitle}_${sender}_${text}"
             
@@ -137,6 +134,51 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         for (node in messageNodes) {
             node.recycle()
         }
+    }
+
+    /**
+     * Extracts the sender name from group message bubble structure, or falls back to LTR/RTL screen alignment.
+     */
+    private fun getSenderName(node: AccessibilityNodeInfo, activeChat: String, kidName: String): String {
+        val parent = node.parent
+        if (parent != null) {
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            
+            // Search sibling TextViews in the bubble to see if there is a name tag at the top
+            for (i in 0 until parent.childCount) {
+                val child = parent.getChild(i) ?: continue
+                if (child.className == "android.widget.TextView") {
+                    val childText = child.text?.toString()?.trim() ?: ""
+                    if (childText.isNotEmpty() && !isMetadataOrTime(childText) && childText != node.text?.toString()?.trim()) {
+                        val childBounds = Rect()
+                        child.getBoundsInScreen(childBounds)
+                        // In WhatsApp group layouts, the sender's name is placed strictly above the message text
+                        if (childBounds.top < bounds.top && childBounds.left >= bounds.left - 50) {
+                            val name = childText
+                            child.recycle()
+                            parent.recycle()
+                            return name
+                        }
+                    }
+                }
+                child.recycle()
+            }
+            parent.recycle()
+        }
+        
+        return deduceDefaultSender(node, activeChat, kidName)
+    }
+
+    /**
+     * Deduces whether the message was sent by the kid or the chat contact based on left/right alignment.
+     */
+    private fun deduceDefaultSender(node: AccessibilityNodeInfo, activeChat: String, kidName: String): String {
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
+        // Heuristic: Outgoing bubbles are aligned to the left/right edges depending on RTL settings.
+        // Usually, in Hebrew/RTL system layout, outgoing bubbles (sent by kid) are on the left (< 250px).
+        return if (bounds.left < 250) kidName else activeChat
     }
 
     /**
