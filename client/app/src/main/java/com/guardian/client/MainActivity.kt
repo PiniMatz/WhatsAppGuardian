@@ -1,5 +1,6 @@
 package com.guardian.client
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -66,12 +67,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateServiceStatus() {
         val accessibilityEnabled = isAccessibilityServiceEnabled(this, WhatsAppAccessibilityService::class.java)
-        if (accessibilityEnabled) {
-            tvStatus.text = "סטטוס שירות: פעיל באיתור שיחות 🛡️"
-            tvStatus.setTextColor(resources.getColor(android.R.color.holo_green_light, null))
-        } else {
-            tvStatus.text = "סטטוס שירות: כבוי (יש לאפשר נגישות)"
-            tvStatus.setTextColor(resources.getColor(android.R.color.holo_red_light, null))
+        val notificationEnabled = isNotificationServiceEnabled(this)
+        
+        when {
+            accessibilityEnabled && notificationEnabled -> {
+                tvStatus.text = "סטטוס שירות: הכל מוגדר בהצלחה ופעיל! 🛡️"
+                tvStatus.setTextColor(resources.getColor(android.R.color.holo_green_light, null))
+            }
+            accessibilityEnabled -> {
+                tvStatus.text = "סטטוס שירות: נגישות פעילה, חסר אישור גישה להתראות"
+                tvStatus.setTextColor(resources.getColor(android.R.color.holo_orange_light, null))
+            }
+            notificationEnabled -> {
+                tvStatus.text = "סטטוס שירות: גישה להתראות פעילה, חסר אישור נגישות"
+                tvStatus.setTextColor(resources.getColor(android.R.color.holo_orange_light, null))
+            }
+            else -> {
+                tvStatus.text = "סטטוס שירות: כבוי (יש לאפשר נגישות והתראות)"
+                tvStatus.setTextColor(resources.getColor(android.R.color.holo_red_light, null))
+            }
         }
     }
 
@@ -82,6 +96,21 @@ class MainActivity : AppCompatActivity() {
             val enabledServiceInfo = enabledService.resolveInfo.serviceInfo
             if (enabledServiceInfo.packageName == context.packageName && enabledServiceInfo.name == service.name) {
                 return true
+            }
+        }
+        return false
+    }
+
+    private fun isNotificationServiceEnabled(context: Context): Boolean {
+        val pkgName = context.packageName
+        val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+        if (!TextUtils.isEmpty(flat)) {
+            val names = flat.split(":")
+            for (name in names) {
+                val cn = ComponentName.unflattenFromString(name)
+                if (cn != null && TextUtils.equals(pkgName, cn.packageName)) {
+                    return true
+                }
             }
         }
         return false
