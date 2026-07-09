@@ -108,8 +108,14 @@ object AlertSender {
     fun getKeywords(context: Context): List<String> {
         val sharedPreferences = context.getSharedPreferences("GuardianPrefs", Context.MODE_PRIVATE)
         val json = sharedPreferences.getString("cached_keywords", null) ?: return listOf(
-            "מכות", "להרוג", "נדקור", "סכין", "לרצוח", "אשבור לך", 
-            "ניפגש בחוץ", "חרם", "הומו", "מפגר", "שונא אותך", "תתאבד"
+            // Physical violence & Threats
+            "מכות", "להרוג", "נדקור", "סכין", "לרצוח", "אשבור לך", "נביא לך", 
+            "לפוצץ אותך", "ניפגש בחוץ", "נרביץ", "אגרוף", "כאפה", "כאפות", "לכסח",
+            // Bullying & Social Exclusion
+            "חרם", "אל תדברו", "להעיף", "נעיף", "מנודה", "אף אחד לא אוהב", "סרטן", "תמות", "תתאבד",
+            // Swears & Slurs (common among ages 9-12)
+            "הומו", "מפגר", "מפגרת", "סתומה", "סתום", "טיפש", "טיפשה", "זונה", "שרמוטה", "קוקסינל", 
+            "מכוער", "מכוערת", "שמן", "שמנה", "אוטיסט", "נכה", "כלבה", "כלב"
         )
         return try {
             gson.fromJson(json, Array<String>::class.java).toList()
