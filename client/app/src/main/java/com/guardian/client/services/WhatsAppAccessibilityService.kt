@@ -137,7 +137,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             // Dynamic Sender Name extraction (from group bubble header, or fallback to contact/kid name)
             val sender = getSenderName(node, activeChatTitle, kidName)
 
-            val messageKey = "${activeChatTitle}_${sender}_${text}"
+            val messageKey = "${sender}_${text}"
             
             // Check if this message was already analyzed in this session
             if (!processedMessageKeys.contains(messageKey)) {
@@ -206,7 +206,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         node.getBoundsInScreen(bounds)
         // Heuristic: Outgoing bubbles are aligned to the left/right edges depending on RTL settings.
         // Usually, in Hebrew/RTL system layout, outgoing bubbles (sent by kid) are on the left (< 250px).
-        return if (bounds.left < 250) kidName else activeChat
+        return if (bounds.left < 250) kidName else "הצד השני"
     }
 
     /**
