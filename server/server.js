@@ -87,6 +87,36 @@ app.post('/api/alerts', async (req, res) => {
     return res.status(400).json({ error: "Missing kid_name or target_text" });
   }
 
+  // Deduplication Check (Ignore identical alerts from the same kid within the last 5 minutes)
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  if (db) {
+    try {
+      const existingAlerts = await db.collection('alerts')
+        .where('kid_name', '==', kid_name)
+        .where('target_text', '==', target_text)
+        .where('timestamp', '>', fiveMinutesAgo)
+        .limit(1)
+        .get();
+      
+      if (!existingAlerts.empty) {
+        console.log(`Duplicate alert detected for ${kid_name}: "${target_text}". Skipping processing.`);
+        return res.json({ success: true, duplicate: true });
+      }
+    } catch (err) {
+      console.error("Error checking duplicates in Firestore:", err.message);
+    }
+  } else {
+    const duplicate = mockAlerts.find(a => 
+      a.kid_name === kid_name && 
+      a.target_text === target_text && 
+      (new Date(a.timestamp) > fiveMinutesAgo)
+    );
+    if (duplicate) {
+      console.log(`Duplicate mock alert detected for ${kid_name}: "${target_text}". Skipping processing.`);
+      return res.json({ success: true, duplicate: true });
+    }
+  }
+
   console.log(`Received flagged text from ${kid_name}: "${target_text}"`);
 
   // Analyze text using Gemini LLM

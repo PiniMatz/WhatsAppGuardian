@@ -17,6 +17,38 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     private val processedMessageKeys = LinkedHashSet<String>()
     private val MAX_HISTORY_SIZE = 100
 
+    override fun onCreate() {
+        super.onCreate()
+        loadProcessedKeys()
+    }
+
+    private fun loadProcessedKeys() {
+        try {
+            val prefs = getSharedPreferences("GuardianPrefs", MODE_PRIVATE)
+            val savedKeys = prefs.getStringSet("processed_keys", null)
+            if (savedKeys != null) {
+                processedMessageKeys.clear()
+                processedMessageKeys.addAll(savedKeys)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading processed keys", e)
+        }
+    }
+
+    private fun saveProcessedKey(key: String) {
+        processedMessageKeys.add(key)
+        if (processedMessageKeys.size > MAX_HISTORY_SIZE) {
+            val firstKey = processedMessageKeys.iterator().next()
+            processedMessageKeys.remove(firstKey)
+        }
+        try {
+            val prefs = getSharedPreferences("GuardianPrefs", MODE_PRIVATE)
+            prefs.edit().putStringSet("processed_keys", processedMessageKeys.toSet()).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving processed keys", e)
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: ""
         if (packageName != "com.whatsapp") return
@@ -111,12 +143,8 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             if (!processedMessageKeys.contains(messageKey)) {
                 Log.d(TAG, "New message in [$activeChatTitle] from $sender: $text")
                 
-                // Add to history
-                processedMessageKeys.add(messageKey)
-                if (processedMessageKeys.size > MAX_HISTORY_SIZE) {
-                    val firstKey = processedMessageKeys.iterator().next()
-                    processedMessageKeys.remove(firstKey)
-                }
+                // Add to history and persist
+                saveProcessedKey(messageKey)
 
                 // Add to context cache
                 AlertSender.addMessageToContext(activeChatTitle, sender, text)
