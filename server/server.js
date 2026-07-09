@@ -87,7 +87,7 @@ app.post('/api/alerts', async (req, res) => {
     return res.status(400).json({ error: "Missing kid_name or target_text" });
   }
 
-  // Deduplication Check (Ignore identical alerts from the same kid within the last 5 minutes)
+  // Deduplication Check (Ignore identical alerts from the same kid within the last 5 minutes, extending the window)
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   if (db) {
     try {
@@ -99,7 +99,11 @@ app.post('/api/alerts', async (req, res) => {
         .get();
       
       if (!existingAlerts.empty) {
-        console.log(`Duplicate alert detected for ${kid_name}: "${target_text}". Skipping processing.`);
+        const duplicateDoc = existingAlerts.docs[0];
+        console.log(`Duplicate alert detected for ${kid_name}: "${target_text}". Extending block window by 5 minutes.`);
+        await duplicateDoc.ref.update({
+          timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
         return res.json({ success: true, duplicate: true });
       }
     } catch (err) {
@@ -112,7 +116,8 @@ app.post('/api/alerts', async (req, res) => {
       (new Date(a.timestamp) > fiveMinutesAgo)
     );
     if (duplicate) {
-      console.log(`Duplicate mock alert detected for ${kid_name}: "${target_text}". Skipping processing.`);
+      console.log(`Duplicate mock alert detected for ${kid_name}: "${target_text}". Extending block window by 5 minutes.`);
+      duplicate.timestamp = new Date().toISOString();
       return res.json({ success: true, duplicate: true });
     }
   }
@@ -124,6 +129,7 @@ app.post('/api/alerts', async (req, res) => {
   console.log("Analysis Result:", analysis);
 
   const alertData = {
+    id: 'alert_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
     kid_name,
     target_text,
     context: context || [],
@@ -275,6 +281,105 @@ app.post('/api/alerts/:id/dismiss', async (req, res) => {
       mockAlerts.splice(idx, 1);
     }
     res.json({ success: true });
+  }
+});
+
+// API: Bulk Save alerts (star / save to keep them from being auto-deleted)
+app.post('/api/alerts/bulk-save', async (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids)) {
+    return res.status(400).json({ error: "Missing or invalid ids array" });
+  }
+  console.log(`Request to bulk save ${ids.length} alerts.`);
+  
+  if (db) {
+    try {
+      const batch = db.batch();
+      ids.forEach(id => {
+        const docRef = db.collection('alerts').doc(id);
+        batch.update(docRef, { saved: true });
+      });
+      await batch.commit();
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error bulk updating alerts in Firestore:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    ids.forEach(id => {
+      const alert = mockAlerts.find(a => a.id === id);
+      if (alert) alert.saved = true;
+    });
+    res.json({ success: true });
+  }
+});
+
+// API: Bulk Delete alerts
+app.post('/api/alerts/bulk-delete', async (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids)) {
+    return res.status(400).json({ error: "Missing or invalid ids array" });
+  }
+  console.log(`Request to bulk delete ${ids.length} alerts.`);
+  
+  if (db) {
+    try {
+      const batch = db.batch();
+      ids.forEach(id => {
+        const docRef = db.collection('alerts').doc(id);
+        batch.delete(docRef);
+      });
+      await batch.commit();
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error bulk deleting alerts from Firestore:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    for (let i = mockAlerts.length - 1; i >= 0; i--) {
+      if (ids.includes(mockAlerts[i].id)) {
+        mockAlerts.splice(i, 1);
+      }
+    }
+    res.json({ success: true });
+  }
+});
+
+// API: Delete all unsaved alerts
+app.post('/api/alerts/delete-unsaved', async (req, res) => {
+  console.log("Request to delete all unsaved alerts.");
+  if (db) {
+    try {
+      const snapshot = await db.collection('alerts').get();
+      const batch = db.batch();
+      let count = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.saved !== true) {
+          batch.delete(doc.ref);
+          count++;
+        }
+      });
+      if (count > 0) {
+        await batch.commit();
+      }
+      console.log(`Deleted all ${count} unsaved alerts.`);
+      res.json({ success: true, count });
+    } catch (err) {
+      console.error("Error deleting unsaved alerts from Firestore:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const originalCount = mockAlerts.length;
+    let count = 0;
+    for (let i = mockAlerts.length - 1; i >= 0; i--) {
+      if (mockAlerts[i].saved !== true) {
+        mockAlerts.splice(i, 1);
+        count++;
+      }
+    }
+    console.log(`Deleted all ${count} unsaved mock alerts.`);
+    res.json({ success: true, count });
   }
 });
 

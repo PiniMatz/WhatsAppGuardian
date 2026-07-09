@@ -159,6 +159,21 @@
     .alert-card.self_harm::after { background-color: var(--accent-info); }
     .alert-card.none::after { background-color: var(--text-muted); }
 
+    .alert-card.saved {
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      box-shadow: 0 0 12px rgba(251, 191, 36, 0.1);
+    }
+
+    @keyframes starPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+    .star-badge {
+      animation: starPulse 2.5s infinite ease-in-out;
+      display: inline-block;
+    }
+
     .alert-header {
       display: flex;
       justify-content: space-between;
@@ -615,6 +630,21 @@
         <button id="delete-kid-btn" onclick="deleteCurrentKid()" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s ease;">❌ הסר ילד מהניטור</button>
       </div>
 
+      <!-- Bulk Actions & Delete All Controls -->
+      <div id="bulk-actions-panel" class="filter-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: 12px; display: none;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span style="font-size: 0.9rem; font-weight: bold; color: var(--text-muted);">נבחרו <span id="selected-count" style="color: var(--primary);">0</span> התרעות:</span>
+          <button onclick="bulkSaveAlerts()" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s; font-family: inherit;">⭐ שמור התרעות שנבחרו</button>
+          <button onclick="bulkDeleteAlerts()" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s; font-family: inherit;">🗑️ מחק התרעות שנבחרו</button>
+        </div>
+        <button onclick="clearSelection()" style="background: transparent; color: var(--text-muted); border: none; font-size: 0.85rem; cursor: pointer; text-decoration: underline; font-family: inherit;">בטל בחירה</button>
+      </div>
+
+      <!-- Delete All Unsaved Control -->
+      <div id="delete-all-unsaved-container" style="display: flex; justify-content: flex-end; margin-top: 1rem; margin-bottom: 0.5rem;">
+        <button onclick="deleteAllUnsavedAlerts()" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); padding: 0.45rem 1rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s ease; display: none; font-family: inherit;" id="delete-unsaved-btn">🗑️ מחק את כל ההתרעות שאינן שמורות</button>
+      </div>
+
       <div id="alerts-list" class="alerts-grid">
         <!-- Alerts dynamically inserted here -->
         <div class="no-alerts">טוען התרעות...</div>
@@ -789,19 +819,29 @@
 
       if (filteredAlerts.length === 0) {
         container.innerHTML = '<div class="no-alerts">אין התרעות אלימות התואמות לסינון זה. הכל שקט! 🛡️</div>';
+        document.getElementById('delete-unsaved-btn').style.display = 'none';
         return;
       }
+
+      // Update Delete Unsaved Button visibility (only if there are alerts that are not saved)
+      const hasUnsavedAlerts = filteredAlerts.some(a => a.saved !== true);
+      document.getElementById('delete-unsaved-btn').style.display = hasUnsavedAlerts ? 'block' : 'none';
 
       container.innerHTML = filteredAlerts.map(alert => {
         const categoryLabel = CATEGORY_MAP[alert.category] || alert.category;
         const timeStr = new Date(alert.timestamp).toLocaleString('he-IL');
-        // Identify alert key using document ID or timestamp
         const alertIdentifier = alert.id || alert.timestamp;
+        const isSelected = selectedAlertIds.includes(alertIdentifier);
+        const isSaved = alert.saved === true;
         
         return `
-          <div class="alert-card ${alert.category}">
+          <div class="alert-card ${alert.category} ${isSaved ? 'saved' : ''}" data-id="${alertIdentifier}">
             <div class="alert-header">
-              <span class="kid-badge">${alert.kid_name}</span>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" class="alert-checkbox" data-id="${alertIdentifier}" ${isSelected ? 'checked' : ''} onchange="toggleSelectAlert('${alertIdentifier}', this)" style="width: 1.15rem; height: 1.15rem; cursor: pointer; accent-color: var(--primary);">
+                <span class="kid-badge">${alert.kid_name}</span>
+                ${isSaved ? '<span class="star-badge" title="התרעה שמורה" style="color: #fbbf24; font-size: 1.15rem; margin-right: 0.25rem;">⭐</span>' : ''}
+              </div>
               <span class="alert-time">${timeStr}</span>
             </div>
             <div class="alert-body">
@@ -989,6 +1029,91 @@
         }
       } catch (err) {
         console.error("Failed to reset keywords:", err);
+      }
+    }
+
+    // Multiple Selection and Bulk Actions state
+    let selectedAlertIds = [];
+
+    function toggleSelectAlert(alertId, checkbox) {
+      if (checkbox.checked) {
+        if (!selectedAlertIds.includes(alertId)) {
+          selectedAlertIds.push(alertId);
+        }
+      } else {
+        selectedAlertIds = selectedAlertIds.filter(id => id !== alertId);
+      }
+      
+      // Update selected count and panel visibility
+      document.getElementById('selected-count').innerText = selectedAlertIds.length;
+      document.getElementById('bulk-actions-panel').style.display = selectedAlertIds.length > 0 ? 'flex' : 'none';
+    }
+
+    function clearSelection() {
+      selectedAlertIds = [];
+      document.querySelectorAll('.alert-checkbox').forEach(cb => cb.checked = false);
+      document.getElementById('selected-count').innerText = '0';
+      document.getElementById('bulk-actions-panel').style.display = 'none';
+    }
+
+    async function bulkSaveAlerts() {
+      if (selectedAlertIds.length === 0) return;
+      if (!confirm(`האם אתה בטוח שברצונך לשמור את ${selectedAlertIds.length} ההתרעות שנבחרו? התרעות שמורות לא יימחקו בעת "מחק את כל ההתרעות שאינן שמורות".`)) return;
+      
+      try {
+        const res = await fetch('/api/alerts/bulk-save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: selectedAlertIds })
+        });
+        if (res.ok) {
+          showToastMsg(`${selectedAlertIds.length} התרעות נשמרו בהצלחה.`);
+          selectedAlertIds = [];
+          document.getElementById('bulk-actions-panel').style.display = 'none';
+          loadAlerts();
+        }
+      } catch (err) {
+        console.error("Failed to bulk save alerts:", err);
+      }
+    }
+
+    async function bulkDeleteAlerts() {
+      if (selectedAlertIds.length === 0) return;
+      if (!confirm(`האם אתה בטוח שברצונך למחוק את ${selectedAlertIds.length} ההתרעות שנבחרו?`)) return;
+      
+      try {
+        const res = await fetch('/api/alerts/bulk-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: selectedAlertIds })
+        });
+        if (res.ok) {
+          showToastMsg(`${selectedAlertIds.length} התרעות נמחקו בהצלחה.`);
+          selectedAlertIds = [];
+          document.getElementById('bulk-actions-panel').style.display = 'none';
+          loadAlerts();
+        }
+      } catch (err) {
+        console.error("Failed to bulk delete alerts:", err);
+      }
+    }
+
+    async function deleteAllUnsavedAlerts() {
+      if (!confirm("האם אתה בטוח שברצונך למחוק את כל ההתרעות שאינן שמורות? פעולה זו תמחק לצמיתות את כל האזהרות שלא סימנת בכוכב ⭐.")) return;
+      
+      try {
+        const res = await fetch('/api/alerts/delete-unsaved', {
+          method: 'POST'
+        });
+        if (res.ok) {
+          const data = await res.json();
+          showToastMsg(`נמחקו ${data.count} התרעות שאינן שמורות.`);
+          selectedAlertIds = [];
+          document.getElementById('bulk-actions-panel').style.display = 'none';
+          loadAlerts();
+        }
+      } catch (err) {
+        console.error("Failed to delete unsaved alerts:", err);
       }
     }
 
