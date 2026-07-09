@@ -8,7 +8,7 @@ import com.guardian.client.utils.AlertSender
 
 class WhatsAppNotificationListener : NotificationListenerService() {
 
-    private const val TAG = "WhatsAppNotification"
+    private val TAG = "WhatsAppNotification"
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName != "com.whatsapp") return

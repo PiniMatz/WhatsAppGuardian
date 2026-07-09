@@ -10,7 +10,7 @@ import java.util.Calendar
 
 class WhatsAppAccessibilityService : AccessibilityService() {
 
-    private const val TAG = "WhatsAppAccessibility"
+    private val TAG = "WhatsAppAccessibility"
     private var activeChatTitle = "וואטסאפ"
     
     // Set to store recently processed messages to prevent duplicate alerts

@@ -1,5 +1,6 @@
 package com.guardian.client
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -91,7 +92,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun isAccessibilityServiceEnabled(context: Context, service: Class<*>): Boolean {
         val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityManager.FEEDBACK_GENERIC)
+        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
         for (enabledService in enabledServices) {
             val enabledServiceInfo = enabledService.resolveInfo.serviceInfo
             if (enabledServiceInfo.packageName == context.packageName && enabledServiceInfo.name == service.name) {
