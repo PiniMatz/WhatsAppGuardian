@@ -271,6 +271,21 @@ app.post('/api/kids/delete', async (req, res) => {
   }
 });
 
+// API: Reset keywords list to default code configurations (Dynamic seeding overwrite)
+app.post('/api/config/keywords/reset', async (req, res) => {
+  console.log("Resetting keywords list to default configurations");
+  if (db) {
+    try {
+      await db.collection('config').doc('keywords').set({ list: DEFAULT_KEYWORDS });
+      console.log("Default keywords seeded in Firestore.");
+    } catch (err) {
+      console.error("Failed to seed keywords in Firestore:", err.message);
+    }
+  }
+  mockKeywords = [...DEFAULT_KEYWORDS];
+  res.json({ success: true, keywords: DEFAULT_KEYWORDS });
+});
+
 // Serve the Dashboard dashboard page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
