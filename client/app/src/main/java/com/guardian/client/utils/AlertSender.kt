@@ -17,7 +17,7 @@ object AlertSender {
     
     // Change this IP to your backend server's IP address (e.g., http://192.168.1.15:3000)
     // 10.0.2.2 is the default IP to access your hosting computer's localhost from the Android emulator.
-    const val SERVER_URL = "http://10.0.2.2:3000"
+    const val SERVER_URL = "http://10.221.219.12:3000"
 
     private val client = OkHttpClient()
     private val gson = Gson()
