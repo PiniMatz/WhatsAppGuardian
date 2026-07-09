@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>שומר הוואטסאפ - לוח בקרה להורים</title>
+  <!-- Google Fonts: Assistant / Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --accent-danger: #ef4444;
+      --accent-warning: #f59e0b;
+      --accent-info: #0ea5e9;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Assistant', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(239, 68, 68, 0.1) 0px, transparent 50%);
+      color: var(--text-main);
+      min-height: 100/vmax;
+      padding-bottom: 2rem;
+    }
+
+    header {
+      backdrop-filter: blur(12px);
+      background: rgba(15, 23, 42, 0.6);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      font-size: 1.75rem;
+      background: linear-gradient(135deg, var(--primary), var(--accent-info));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .logo-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(30, 41, 59, 0.5);
+      padding: 0.25rem;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 1.25rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: var(--text-main);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .dashboard-panel {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .dashboard-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Grid Layout for Alerts */
+    .alerts-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .alert-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(16px);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .alert-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Color Indicator border */
+    .alert-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      width: 6px;
+    }
+
+    .alert-card.physical_violence::after { background-color: var(--accent-danger); }
+    .alert-card.cyberbullying::after { background-color: var(--accent-warning); }
+    .alert-card.self_harm::after { background-color: var(--accent-info); }
+    .alert-card.none::after { background-color: var(--text-muted); }
+
+    .alert-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .kid-badge {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .alert-time {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .alert-body {
+      margin-bottom: 1.25rem;
+    }
+
+    .target-message {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+      background: rgba(15, 23, 42, 0.4);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin-top: 0.5rem;
+      border-right: 3px solid var(--primary);
+    }
+
+    .explanation-box {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: rgba(99, 102, 241, 0.05);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: #cbd5e1;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .alert-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--card-border);
+      padding-top: 1rem;
+    }
+
+    .threat-tag {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+    }
+
+    .threat-tag.physical_violence { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+    .threat-tag.cyberbullying { background: rgba(245, 158, 11, 0.15); color: #fde047; }
+    .threat-tag.self_harm { background: rgba(14, 165, 233, 0.15); color: #7dd3fc; }
+    .threat-tag.none { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+
+    .context-btn {
+      background: transparent;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+      padding: 0.35rem 0.85rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .context-btn:hover {
+      background: var(--text-muted);
+      color: var(--bg-dark);
+    }
+
+    /* Context Modal Styling */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 550px;
+      padding: 2rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+
+    .close-modal {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      background: transparent;
+      border: none;
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 0.75rem;
+    }
+
+    .chat-bubble-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 350px;
+      overflow-y: auto;
+      padding: 0.5rem;
+    }
+
+    .chat-bubble {
+      max-width: 85%;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+
+    .chat-bubble.peer {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      align-self: flex-start;
+      border-bottom-right-radius: 2px;
+    }
+
+    .chat-bubble.kid {
+      background: var(--primary);
+      color: white;
+      align-self: flex-end;
+      border-bottom-left-radius: 2px;
+    }
+
+    .chat-bubble.flagged {
+      background: var(--accent-danger);
+      color: white;
+      align-self: flex-end;
+      border-bottom-left-radius: 2px;
+      font-weight: 700;
+    }
+
+    /* Keyword Settings Layout */
+    .keywords-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2rem;
+      backdrop-filter: blur(16px);
+    }
+
+    .keywords-header {
+      margin-bottom: 1.5rem;
+    }
+
+    .keywords-header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-top: 0.25rem;
+    }
+
+    .keyword-input-group {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .keyword-input {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      color: var(--text-main);
+      font-size: 1.1rem;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .keyword-input:focus {
+      border-color: var(--primary);
+    }
+
+    .add-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .add-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .keywords-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .keyword-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.5rem 0.85rem;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+    }
+
+    .remove-keyword {
+      background: transparent;
+      border: none;
+      color: var(--accent-danger);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .save-keywords-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 0.75rem 2rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      width: 100%;
+    }
+
+    .save-keywords-btn:hover {
+      opacity: 0.9;
+    }
+
+    /* Notification message popup */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 2rem;
+      background: #10b981;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+      display: none;
+      animation: slideIn 0.3s ease;
+      font-weight: bold;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(100px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .no-alerts {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-container">
+      <div class="logo-icon">🛡️</div>
+      <div class="logo-title">שומר וואטסאפ</div>
+    </div>
+    
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('feed-panel')">התרעות שיחה</button>
+      <button class="tab-btn" onclick="switchTab('settings-panel')">הגדרת מילים</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Tab 1: Alert Feed -->
+    <section id="feed-panel" class="dashboard-panel active">
+      <div id="alerts-list" class="alerts-grid">
+        <!-- Alerts dynamically inserted here -->
+        <div class="no-alerts">טוען התרעות...</div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Keyword Settings -->
+    <section id="settings-panel" class="dashboard-panel">
+      <div class="keywords-card">
+        <div class="keywords-header">
+          <h2>רשימת מילות מפתח לחסימה</h2>
+          <p>הודעות המכילות את המילים הללו יסוננו ויעלו לניתוח AI. השינויים יישלחו אוטומטית למכשירי הילדים.</p>
+        </div>
+
+        <div class="keyword-input-group">
+          <input type="text" id="new-keyword-input" class="keyword-input" placeholder="הקלד מילה או ביטוי חדש..." onkeydown="if(event.key === 'Enter') addKeyword()">
+          <button class="add-btn" onclick="addKeyword()">הוסף מילה</button>
+        </div>
+
+        <div id="keywords-list" class="keywords-container">
+          <!-- Keywords chips dynamically inserted here -->
+        </div>
+
+        <button class="save-keywords-btn" onclick="saveKeywordsToServer()">שמור וסנכרן מכשירים</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal for Conversation Context -->
+  <div id="context-modal" class="modal" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <button class="close-modal" onclick="closeModal()">×</button>
+      <div class="modal-title" id="modal-title">הקשר השיחה</div>
+      <div class="chat-bubble-container" id="chat-bubbles">
+        <!-- Messages bubbles inserted here -->
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-msg" class="toast">הגדרות נשמרו וסונכרנו בהצלחה!</div>
+
+  <script>
+    let keywords = [];
+    let alerts = [];
+
+    // Switch between dashboard panels
+    function switchTab(tabId) {
+      document.querySelectorAll('.dashboard-panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      document.getElementById(tabId).classList.add('active');
+      event.target.classList.add('active');
+
+      if (tabId === 'settings-panel') {
+        loadKeywordsFromServer();
+      }
+    }
+
+    // Fetch alerts from API
+    async function loadAlerts() {
+      try {
+        const res = await fetch('/api/alerts');
+        alerts = await res.json();
+        renderAlerts();
+      } catch (err) {
+        console.error("Error loading alerts:", err);
+      }
+    }
+
+    // Translate category labels to Hebrew
+    const CATEGORY_MAP = {
+      'physical_violence': 'אלימות פיזית / איומים',
+      'cyberbullying': 'בריונות ברשת / חרם',
+      'self_harm': 'סכנת פגיעה עצמית',
+      'none': 'אחר'
+    };
+
+    // Render alerts in DOM
+    function renderAlerts() {
+      const container = document.getElementById('alerts-list');
+      
+      if (alerts.length === 0) {
+        container.innerHTML = '<div class="no-alerts">אין התרעות אלימות כרגע. הכל שקט! 🛡️</div>';
+        return;
+      }
+
+      container.innerHTML = alerts.map((alert, idx) => {
+        const categoryLabel = CATEGORY_MAP[alert.category] || alert.category;
+        const timeStr = new Date(alert.timestamp).toLocaleString('he-IL');
+        
+        return `
+          <div class="alert-card ${alert.category}">
+            <div class="alert-header">
+              <span class="kid-badge">${alert.kid_name}</span>
+              <span class="alert-time">${timeStr}</span>
+            </div>
+            <div class="alert-body">
+              <div class="alert-time">הודעה שסומנה:</div>
+              <div class="target-message">"${alert.target_text}"</div>
+              ${alert.explanation_hebrew ? `
+                <div class="explanation-box">
+                  <span>💡</span>
+                  <span><strong>ניתוח AI:</strong> ${alert.explanation_hebrew}</span>
+                </div>
+              ` : ''}
+            </div>
+            <div class="alert-footer">
+              <span class="threat-tag ${alert.category}">${categoryLabel} (רמת זיהוי: ${Math.round(alert.confidence * 100)}%)</span>
+              <button class="context-btn" onclick="openContextModal(${idx})">הצג שיחה מלאה</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Modal Operations
+    function openContextModal(index) {
+      const alert = alerts[index];
+      const chatContainer = document.getElementById('chat-bubbles');
+      document.getElementById('modal-title').innerText = `הקשר שיחה עבור ${alert.kid_name}`;
+      
+      chatContainer.innerHTML = '';
+      
+      // Render previous context messages
+      if (alert.context && alert.context.length > 0) {
+        alert.context.forEach(msg => {
+          const isKid = msg.sender.toLowerCase() === alert.kid_name.toLowerCase();
+          const bubbleClass = isKid ? 'kid' : 'peer';
+          chatContainer.innerHTML += `
+            <div class="chat-bubble ${bubbleClass}">
+              <strong>${msg.sender}:</strong> ${msg.text}
+            </div>
+          `;
+        });
+      }
+
+      // Render the flagged message at the end
+      chatContainer.innerHTML += `
+        <div class="chat-bubble flagged">
+          <strong>${alert.kid_name} (סומן):</strong> ${alert.target_text}
+        </div>
+      `;
+
+      document.getElementById('context-modal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('context-modal').classList.remove('open');
+    }
+
+    // Keywords Management
+    async function loadKeywordsFromServer() {
+      try {
+        const res = await fetch('/api/config/keywords');
+        const data = await res.json();
+        keywords = data.keywords || [];
+        renderKeywords();
+      } catch (err) {
+        console.error("Error fetching keywords:", err);
+      }
+    }
+
+    function renderKeywords() {
+      const container = document.getElementById('keywords-list');
+      container.innerHTML = keywords.map((word, idx) => `
+        <div class="keyword-chip">
+          <span>${word}</span>
+          <button class="remove-keyword" onclick="removeKeyword(${idx})">×</button>
+        </div>
+      `).join('');
+    }
+
+    function addKeyword() {
+      const input = document.getElementById('new-keyword-input');
+      const val = input.value.trim();
+      if (val && !keywords.includes(val)) {
+        keywords.push(val);
+        renderKeywords();
+        input.value = '';
+      }
+    }
+
+    function removeKeyword(index) {
+      keywords.splice(index, 1);
+      renderKeywords();
+    }
+
+    async function saveKeywordsToServer() {
+      try {
+        const res = await fetch('/api/config/keywords', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keywords })
+        });
+        if (res.ok) {
+          showToast();
+        }
+      } catch (err) {
+        console.error("Failed to save keywords:", err);
+      }
+    }
+
+    function showToast() {
+      const toast = document.getElementById('toast-msg');
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3000);
+    }
+
+    // Auto load feed
+    loadAlerts();
+    setInterval(loadAlerts, 4000); // refresh every 4 seconds
+  </script>
+</body>
+</html>

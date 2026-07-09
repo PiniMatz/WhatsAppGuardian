@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center_horizontal"
+    android:background="#0f172a">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🛡️"
+        android:textSize="64sp"
+        android:layout_marginTop="32dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="שומר וואטסאפ"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#f8fafc"
+        android:layout_marginTop="16dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="הגדרת אפליקציית הילד"
+        android:textSize="16sp"
+        android:textColor="#94a3b8"
+        android:layout_marginTop="8dp"/>
+
+    <!-- Kid Name Form -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="40dp"
+        android:background="#1e293b"
+        android:padding="16dp"
+        android:elevation="4dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="שם הילד/ה:"
+            android:textColor="#cbd5e1"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_gravity="right"/>
+
+        <EditText
+            android:id="@+id/et_kid_name"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="#0f172a"
+            android:padding="10dp"
+            android:textColor="#f8fafc"
+            android:hint="לדוגמה: נועם"
+            android:textColorHint="#475569"
+            android:gravity="right"
+            android:inputType="text"/>
+
+        <Button
+            android:id="@+id/btn_save_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="#6366f1"
+            android:text="שמור שם ילד"
+            android:textColor="#ffffff"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
+    <!-- Settings Links -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="נדרש לאפשר את ההרשאות הבאות:"
+        android:textColor="#cbd5e1"
+        android:textSize="14sp"
+        android:layout_marginTop="32dp"
+        android:textStyle="bold"/>
+
+    <Button
+        android:id="@+id/btn_accessibility"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="#475569"
+        android:text="אפשר שירות נגישות (Accessibility)"
+        android:textColor="#ffffff"/>
+
+    <Button
+        android:id="@+id/btn_notifications"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="#475569"
+        android:text="אפשר גישה להתראות (Notifications)"
+        android:textColor="#ffffff"/>
+
+    <TextView
+        android:id="@+id/tv_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="סטטוס שירות: כבוי"
+        android:textColor="#ef4444"
+        android:textStyle="bold"
+        android:layout_marginTop="24dp"
+        android:textSize="14sp"/>
+
+</LinearLayout>
