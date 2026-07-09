@@ -16,20 +16,31 @@ const PORT = process.env.PORT || 3000;
 let db = null;
 const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
 
-if (fs.existsSync(serviceAccountPath)) {
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    db = admin.firestore();
+    console.log("Firebase Firestore initialized successfully via Environment Variable.");
+  } catch (err) {
+    console.error("Error initializing Firebase Admin with env variable:", err.message);
+  }
+} else if (fs.existsSync(serviceAccountPath)) {
   try {
     const serviceAccount = require(serviceAccountPath);
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
     db = admin.firestore();
-    console.log("Firebase Firestore initialized successfully via Service Account.");
+    console.log("Firebase Firestore initialized successfully via Service Account file.");
   } catch (err) {
-    console.error("Error initializing Firebase Admin with service account:", err.message);
+    console.error("Error initializing Firebase Admin with service account file:", err.message);
   }
 } else {
-  console.warn("WARNING: firebase-service-account.json not found.");
-  console.warn("Please download your Service Account JSON from Firebase Console and save it as server/firebase-service-account.json");
+  console.warn("WARNING: Firebase credentials not found.");
+  console.warn("Please add FIREBASE_SERVICE_ACCOUNT env var or place server/firebase-service-account.json");
   console.warn("Running in local mock database mode.");
 }
 
@@ -291,6 +302,10 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`WhatsApp Guardian backend listening on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`WhatsApp Guardian backend listening on port ${PORT}`);
+  });
+}
+
+module.exports = app;
