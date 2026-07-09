@@ -461,6 +461,105 @@
       color: var(--text-muted);
       font-size: 1.2rem;
     }
+
+    /* Stats Section */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .stat-icon {
+      font-size: 1.75rem;
+      background: rgba(99, 102, 241, 0.1);
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #a5b4fc;
+    }
+
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-val {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      background: rgba(30, 41, 59, 0.3);
+      padding: 0.75rem 1.25rem;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .filter-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #cbd5e1;
+    }
+
+    .filter-chips {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .filter-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .filter-chip:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+
+    .filter-chip.active {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--primary);
+      color: #a5b4fc;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
+    }
   </style>
 </head>
 <body>
@@ -480,6 +579,39 @@
   <main>
     <!-- Tab 1: Alert Feed -->
     <section id="feed-panel" class="dashboard-panel active">
+      <!-- Stats Cards -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon">🚨</div>
+          <div class="stat-info">
+            <span id="stat-alerts-count" class="stat-val">0</span>
+            <span class="stat-label">התרעות שסומנו</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👶</div>
+          <div class="stat-info">
+            <span id="stat-kids-count" class="stat-val">0</span>
+            <span class="stat-label">ילדים מנוטרים</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⚠️</div>
+          <div class="stat-info">
+            <span id="stat-danger-category" class="stat-val">אין</span>
+            <span class="stat-label">איום נפוץ</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kid Filter Bar -->
+      <div class="filter-bar">
+        <span class="filter-title">סנן לפי ילד/ה:</span>
+        <div id="filter-chips-container" class="filter-chips">
+          <button class="filter-chip active" onclick="setKidFilter('all')">הכל</button>
+        </div>
+      </div>
+
       <div id="alerts-list" class="alerts-grid">
         <!-- Alerts dynamically inserted here -->
         <div class="no-alerts">טוען התרעות...</div>
@@ -524,6 +656,7 @@
   <script>
     let keywords = [];
     let alerts = [];
+    let currentKidFilter = 'all';
 
     // Switch between dashboard panels
     function switchTab(tabId) {
@@ -547,6 +680,7 @@
       try {
         const res = await fetch('/api/alerts');
         alerts = await res.json();
+        updateStatsAndFilters();
         renderAlerts();
       } catch (err) {
         console.error("Error loading alerts:", err);
@@ -561,18 +695,91 @@
       'none': 'אחר'
     };
 
-    // Render alerts in DOM
+    // Calculate metrics and update filter chips
+    function updateStatsAndFilters() {
+      // 1. Calculate Alerts Count
+      document.getElementById('stat-alerts-count').innerText = alerts.length;
+
+      // 2. Calculate Unique Kids
+      const uniqueKids = Array.from(new Set(alerts.map(a => a.kid_name)));
+      document.getElementById('stat-kids-count').innerText = uniqueKids.length;
+
+      // 3. Calculate Dominant Danger Category
+      if (alerts.length > 0) {
+        const categoriesCount = {};
+        alerts.forEach(a => {
+          if (a.category && a.category !== 'none') {
+            categoriesCount[a.category] = (categoriesCount[a.category] || 0) + 1;
+          }
+        });
+
+        let dominantCategory = 'אין';
+        let maxCount = 0;
+        for (const cat in categoriesCount) {
+          if (categoriesCount[cat] > maxCount) {
+            maxCount = categoriesCount[cat];
+            dominantCategory = CATEGORY_MAP[cat] || cat;
+          }
+        }
+        document.getElementById('stat-danger-category').innerText = dominantCategory;
+      } else {
+        document.getElementById('stat-danger-category').innerText = 'אין';
+      }
+
+      // 4. Update Kid Filter Chips dynamically
+      const container = document.getElementById('filter-chips-container');
+      
+      // Seed with "All" chip
+      let chipsHtml = `
+        <button class="filter-chip ${currentKidFilter === 'all' ? 'active' : ''}" 
+                onclick="setKidFilter('all')">הכל</button>
+      `;
+
+      // Add chips for each unique kid
+      uniqueKids.forEach(kid => {
+        chipsHtml += `
+          <button class="filter-chip ${currentKidFilter === kid ? 'active' : ''}" 
+                  onclick="setKidFilter('${kid}')">${kid}</button>
+        `;
+      });
+
+      container.innerHTML = chipsHtml;
+    }
+
+    // Set active kid filter
+    function setKidFilter(kidName) {
+      currentKidFilter = kidName;
+      
+      // Update active state class in UI chips immediately
+      document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.classList.remove('active');
+        if (chip.innerText.trim() === (kidName === 'all' ? 'הכל' : kidName)) {
+          chip.classList.add('active');
+        }
+      });
+
+      renderAlerts();
+    }
+
+    // Render alerts in DOM, respecting filters
     function renderAlerts() {
       const container = document.getElementById('alerts-list');
       
-      if (alerts.length === 0) {
-        container.innerHTML = '<div class="no-alerts">אין התרעות אלימות כרגע. הכל שקט! 🛡️</div>';
+      // Filter list based on selected kid
+      const filteredAlerts = currentKidFilter === 'all' 
+        ? alerts 
+        : alerts.filter(a => a.kid_name === currentKidFilter);
+
+      if (filteredAlerts.length === 0) {
+        container.innerHTML = '<div class="no-alerts">אין התרעות אלימות התואמות לסינון זה. הכל שקט! 🛡️</div>';
         return;
       }
 
-      container.innerHTML = alerts.map((alert, idx) => {
+      container.innerHTML = filteredAlerts.map(alert => {
         const categoryLabel = CATEGORY_MAP[alert.category] || alert.category;
         const timeStr = new Date(alert.timestamp).toLocaleString('he-IL');
+        // Identify alert key using document ID or timestamp
+        const alertIdentifier = alert.id || alert.timestamp;
         
         return `
           <div class="alert-card ${alert.category}">
@@ -592,16 +799,18 @@
             </div>
             <div class="alert-footer">
               <span class="threat-tag ${alert.category}">${categoryLabel} (רמת זיהוי: ${Math.round(alert.confidence * 100)}%)</span>
-              <button class="context-btn" onclick="openContextModal(${idx})">הצג שיחה מלאה</button>
+              <button class="context-btn" onclick="openContextModal('${alertIdentifier}')">הצג שיחה מלאה</button>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    // Modal Operations
-    function openContextModal(index) {
-      const alert = alerts[index];
+    // Modal Operations (Modified to locate alert by ID/Timestamp)
+    function openContextModal(alertIdentifier) {
+      const alert = alerts.find(a => a.id === alertIdentifier || a.timestamp === alertIdentifier);
+      if (!alert) return;
+
       const chatContainer = document.getElementById('chat-bubbles');
       document.getElementById('modal-title').innerText = `הקשר שיחה עבור ${alert.kid_name}`;
       
