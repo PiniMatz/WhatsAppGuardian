@@ -59,9 +59,9 @@ object AlertSender {
      * Checks if a message contains any Hebrew threat keyword.
      */
     fun containsThreatKeyword(text: String, keywords: List<String>): Boolean {
-        val lowercaseText = text.toLowerCase()
+        val lowercaseText = text.lowercase()
         for (keyword in keywords) {
-            if (lowercaseText.contains(keyword.toLowerCase())) {
+            if (lowercaseText.contains(keyword.lowercase())) {
                 return true
             }
         }
