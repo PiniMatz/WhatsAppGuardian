@@ -248,7 +248,6 @@ app.delete('/api/alerts/:id', async (req, res) => {
   }
 });
 
-// API: Dismiss warning as a false positive (System Learning)
 app.post('/api/alerts/:id/dismiss', async (req, res) => {
   const alertId = req.params.id;
   console.log(`Request to dismiss alert as false positive: ${alertId}`);
@@ -279,6 +278,27 @@ app.post('/api/alerts/:id/dismiss', async (req, res) => {
       const alertData = mockAlerts[idx];
       console.log(`Mock learning: Saved false positive: "${alertData.target_text}"`);
       mockAlerts.splice(idx, 1);
+    }
+    res.json({ success: true });
+  }
+});
+
+// API: Remove alert from saved archive
+app.post('/api/alerts/:id/unsave', async (req, res) => {
+  const alertId = req.params.id;
+  console.log(`Request to unsave alert: ${alertId}`);
+  if (db) {
+    try {
+      await db.collection('alerts').doc(alertId).update({ saved: false });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error unsaving from Firestore:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const alert = mockAlerts.find(a => a.id === alertId);
+    if (alert) {
+      alert.saved = false;
     }
     res.json({ success: true });
   }

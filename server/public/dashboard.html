@@ -575,6 +575,112 @@
       color: #a5b4fc;
       box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
     }
+
+    /* Mobile-Dedicated Responsive UI Design */
+    @media (max-width: 768px) {
+      header {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+        align-items: center;
+        text-align: center;
+      }
+
+      .nav-tabs {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.25rem;
+      }
+
+      .tab-btn {
+        padding: 0.6rem 0.25rem;
+        font-size: 0.8rem;
+        text-align: center;
+        justify-content: center;
+        white-space: nowrap;
+      }
+
+      main {
+        padding: 1rem 0.75rem;
+      }
+
+      .stats-row {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0.75rem;
+      }
+
+      .filter-bar > div {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .filter-chips {
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+      }
+
+      #delete-kid-btn {
+        width: 100%;
+        text-align: center;
+      }
+
+      .alert-card {
+        padding: 1rem;
+      }
+
+      .alert-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+
+      .alert-header .alert-time {
+        align-self: flex-end;
+        font-size: 0.75rem;
+      }
+
+      .alert-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .alert-actions button {
+        width: 100%;
+        padding: 0.5rem;
+      }
+
+      #bulk-actions-panel {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      #bulk-actions-panel > div {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      #bulk-actions-panel button {
+        width: 100%;
+      }
+
+      .modal-content {
+        width: 95%;
+        padding: 1rem;
+        margin: 5% auto;
+      }
+
+      .chat-bubble {
+        max-width: 90%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -586,8 +692,9 @@
     </div>
     
     <div class="nav-tabs">
-      <button class="tab-btn active" onclick="switchTab('feed-panel')">התרעות שיחה</button>
-      <button class="tab-btn" onclick="switchTab('settings-panel')">הגדרת מילים</button>
+      <button class="tab-btn active" onclick="switchTab('feed-panel')">💬 התרעות</button>
+      <button class="tab-btn" onclick="switchTab('saved-panel')">⭐ שמורות</button>
+      <button class="tab-btn" onclick="switchTab('settings-panel')">⚙️ מילים</button>
     </div>
   </header>
 
@@ -651,7 +758,22 @@
       </div>
     </section>
 
-    <!-- Tab 2: Keyword Settings -->
+    <!-- Tab 2: Saved Alerts Archive -->
+    <section id="saved-panel" class="dashboard-panel">
+      <div class="keywords-card" style="padding: 1.5rem; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; margin-bottom: 2rem;">
+        <div class="keywords-header" style="margin-bottom: 1.5rem;">
+          <h2 style="font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; color: #fbbf24;">⭐ התרעות שמורות</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">הודעות ואזהרות שסומנו על ידך לתיעוד ושימור. הן שמורות לצמיתות עם הקשר השיחה והניתוח, ולא יימחקו בפעולות ניקוי גלובליות.</p>
+        </div>
+
+        <div id="saved-alerts-list" class="alerts-grid">
+          <!-- Saved alerts dynamically inserted here -->
+          <div class="no-alerts">אין התרעות שמורות עדיין. סמן התרעות מהפיד הראשי כדי לשמור אותן כאן! ⭐</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Keyword Settings -->
     <section id="settings-panel" class="dashboard-panel">
       <div class="keywords-card">
         <div class="keywords-header">
@@ -718,6 +840,7 @@
         alerts = await res.json();
         updateStatsAndFilters();
         renderAlerts();
+        renderSavedAlerts();
       } catch (err) {
         console.error("Error loading alerts:", err);
       }
@@ -806,16 +929,18 @@
       });
 
       renderAlerts();
+      renderSavedAlerts();
     }
 
     // Render alerts in DOM, respecting filters
     function renderAlerts() {
       const container = document.getElementById('alerts-list');
       
-      // Filter list based on selected kid
+      // Filter list based on selected kid (excluding saved alerts from active feed)
+      const activeAlerts = alerts.filter(a => a.saved !== true);
       const filteredAlerts = currentKidFilter === 'all' 
-        ? alerts 
-        : alerts.filter(a => a.kid_name === currentKidFilter);
+        ? activeAlerts 
+        : activeAlerts.filter(a => a.kid_name === currentKidFilter);
 
       if (filteredAlerts.length === 0) {
         container.innerHTML = '<div class="no-alerts">אין התרעות אלימות התואמות לסינון זה. הכל שקט! 🛡️</div>';
@@ -902,6 +1027,74 @@
 
     function closeModal() {
       document.getElementById('context-modal').classList.remove('open');
+    }
+
+    // Render saved alerts in DOM
+    function renderSavedAlerts() {
+      const container = document.getElementById('saved-alerts-list');
+      if (!container) return;
+
+      const savedAlerts = alerts.filter(a => a.saved === true);
+
+      // Filter list based on selected kid
+      const filteredSaved = currentKidFilter === 'all' 
+        ? savedAlerts 
+        : savedAlerts.filter(a => a.kid_name === currentKidFilter);
+
+      if (filteredSaved.length === 0) {
+        container.innerHTML = '<div class="no-alerts">אין התרעות שמורות התואמות לסינון זה. 🛡️</div>';
+        return;
+      }
+
+      container.innerHTML = filteredSaved.map(alert => {
+        const categoryLabel = CATEGORY_MAP[alert.category] || alert.category;
+        const timeStr = new Date(alert.timestamp).toLocaleString('he-IL');
+        const alertIdentifier = alert.id || alert.timestamp;
+        
+        return `
+          <div class="alert-card ${alert.category} saved">
+            <div class="alert-header">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="star-badge" style="color: #fbbf24; font-size: 1.15rem;">⭐</span>
+                <span class="kid-badge">${alert.kid_name}</span>
+              </div>
+              <span class="alert-time">${timeStr}</span>
+            </div>
+            <div class="alert-body">
+              <div class="alert-time">הודעה שסומנה:</div>
+              <div class="target-message">"${alert.target_text}"</div>
+              ${alert.explanation_hebrew ? `
+                <div class="explanation-box">
+                  <span>💡</span>
+                  <span><strong>ניתוח AI וסיבת השמירה:</strong> ${alert.explanation_hebrew}</span>
+                </div>
+              ` : ''}
+            </div>
+            <div class="alert-footer">
+              <span class="threat-tag ${alert.category}">${categoryLabel} (רמת זיהוי: ${Math.round(alert.confidence * 100)}%)</span>
+              <button class="context-btn" onclick="openContextModal('${alertIdentifier}')">הצג שיחה מלאה</button>
+            </div>
+            <div class="alert-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; border-top: 1px dashed var(--card-border); padding-top: 0.75rem;">
+              <button onclick="unsaveAlert('${alertIdentifier}')" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🔓 הסר משמורות</button>
+              <button onclick="deleteAlert('${alertIdentifier}')" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🗑️ מחק לצמיתות</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function unsaveAlert(alertId) {
+      try {
+        const res = await fetch(`/api/alerts/${alertId}/unsave`, {
+          method: 'POST'
+        });
+        if (res.ok) {
+          showToastMsg("ההתרעה הוסרה מהרשימה השמורה.");
+          loadAlerts();
+        }
+      } catch (err) {
+        console.error("Failed to unsave alert:", err);
+      }
     }
 
     // Keywords Management
