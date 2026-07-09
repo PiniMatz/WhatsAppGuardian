@@ -47,12 +47,33 @@ ${targetText}
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            is_threat: { type: "BOOLEAN" },
+            category: { 
+              type: "STRING", 
+              enum: ["physical_violence", "cyberbullying", "self_harm", "none"] 
+            },
+            confidence: { type: "NUMBER" },
+            explanation_hebrew: { type: "STRING" }
+          },
+          required: ["is_threat", "category", "confidence", "explanation_hebrew"]
+        }
       }
     });
 
     const responseText = response.text || response.candidates[0].content.parts[0].text;
-    return JSON.parse(responseText.trim());
+    
+    // Clean markdown code fences if present (fallback)
+    let cleanedText = responseText.trim();
+    if (cleanedText.startsWith("```")) {
+      cleanedText = cleanedText.replace(/^```(?:json)?\n/, "").replace(/\n```$/, "");
+    }
+    cleanedText = cleanedText.trim();
+    
+    return JSON.parse(cleanedText);
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     return {
