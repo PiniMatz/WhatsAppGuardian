@@ -605,11 +605,14 @@
       </div>
 
       <!-- Kid Filter Bar -->
-      <div class="filter-bar">
-        <span class="filter-title">סנן לפי ילד/ה:</span>
-        <div id="filter-chips-container" class="filter-chips">
-          <button class="filter-chip active" onclick="setKidFilter('all')">הכל</button>
+      <div class="filter-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <span class="filter-title">סנן לפי ילד/ה:</span>
+          <div id="filter-chips-container" class="filter-chips">
+            <button class="filter-chip active" onclick="setKidFilter('all')">הכל</button>
+          </div>
         </div>
+        <button id="delete-kid-btn" onclick="deleteCurrentKid()" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: bold; transition: all 0.2s ease;">❌ הסר ילד מהניטור</button>
       </div>
 
       <div id="alerts-list" class="alerts-grid">
@@ -744,6 +747,17 @@
       });
 
       container.innerHTML = chipsHtml;
+
+      // Show/Hide Delete Kid button based on current filter selection
+      const deleteKidBtn = document.getElementById('delete-kid-btn');
+      if (deleteKidBtn) {
+        if (currentKidFilter !== 'all') {
+          deleteKidBtn.style.display = 'inline-block';
+          deleteKidBtn.innerText = `❌ הסר את "${currentKidFilter}" מהניטור`;
+        } else {
+          deleteKidBtn.style.display = 'none';
+        }
+      }
     }
 
     // Set active kid filter
@@ -800,6 +814,10 @@
             <div class="alert-footer">
               <span class="threat-tag ${alert.category}">${categoryLabel} (רמת זיהוי: ${Math.round(alert.confidence * 100)}%)</span>
               <button class="context-btn" onclick="openContextModal('${alertIdentifier}')">הצג שיחה מלאה</button>
+            </div>
+            <div class="alert-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; border-top: 1px dashed var(--card-border); padding-top: 0.75rem;">
+              <button onclick="deleteAlert('${alertIdentifier}')" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🗑️ מחק התרעה</button>
+              <button onclick="dismissAlertAsFalse('${alertIdentifier}')" style="background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">⚙️ זוהה בטעות (למידה)</button>
             </div>
           </div>
         `;
@@ -901,6 +919,68 @@
       setTimeout(() => {
         toast.style.display = 'none';
       }, 3000);
+    }
+
+    // Delete a specific alert card
+    async function deleteAlert(alertId) {
+      if (!confirm("האם אתה בטוח שברצונך למחוק התרעה זו?")) return;
+      try {
+        const res = await fetch(`/api/alerts/${alertId}`, {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          showToastMsg("ההתרעה נמחקה בהצלחה.");
+          loadAlerts();
+        }
+      } catch (err) {
+        console.error("Failed to delete alert:", err);
+      }
+    }
+
+    // Dismiss alert as a false positive (dynamic machine learning)
+    async function dismissAlertAsFalse(alertId) {
+      if (!confirm("סימון כהתרעת שווא ישמור את המילים ויאפשר ל-AI ללמוד מהטעות כדי למנוע התרעות דומות בעתיד. האם להמשיך?")) return;
+      try {
+        const res = await fetch(`/api/alerts/${alertId}/dismiss`, {
+          method: 'POST'
+        });
+        if (res.ok) {
+          showToastMsg("סומן כהתרעת שווא. ה-AI לומד את התיקון!");
+          loadAlerts();
+        }
+      } catch (err) {
+        console.error("Failed to dismiss alert:", err);
+      }
+    }
+
+    // Delete all alerts for currently selected kid (removing them from monitoring list)
+    async function deleteCurrentKid() {
+      if (currentKidFilter === 'all') return;
+      if (!confirm(`האם אתה בטוח שברצונך להסיר את הילד "${currentKidFilter}" מהניטור? פעולה זו תמחוק את כל ההתרעות שלו לצמיתות.`)) return;
+      try {
+        const res = await fetch('/api/kids/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kid_name: currentKidFilter })
+        });
+        if (res.ok) {
+          showToastMsg(`הילד "${currentKidFilter}" והתרעותיו הוסרו מהניטור בהצלחה.`);
+          currentKidFilter = 'all';
+          loadAlerts();
+        }
+      } catch (err) {
+        console.error("Failed to delete kid:", err);
+      }
+    }
+
+    // Custom toast function
+    function showToastMsg(msg) {
+      const toast = document.getElementById('toast-msg');
+      toast.innerText = msg;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3500);
     }
 
     // Auto load feed

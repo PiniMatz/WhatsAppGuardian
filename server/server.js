@@ -61,7 +61,7 @@ app.post('/api/alerts', async (req, res) => {
   console.log(`Received flagged text from ${kid_name}: "${target_text}"`);
 
   // Analyze text using Gemini LLM
-  const analysis = await analyzeHebrewText(target_text, context || []);
+  const analysis = await analyzeHebrewText(target_text, context || [], db);
   console.log("Analysis Result:", analysis);
 
   const alertData = {
@@ -160,6 +160,97 @@ app.post('/api/config/keywords', async (req, res) => {
   }
 
   res.json({ success: true, keywords });
+});
+
+// API: Delete a specific alert warning
+app.delete('/api/alerts/:id', async (req, res) => {
+  const alertId = req.params.id;
+  console.log(`Request to delete alert: ${alertId}`);
+  if (db) {
+    try {
+      await db.collection('alerts').doc(alertId).delete();
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting from Firestore:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const idx = mockAlerts.findIndex(a => a.id === alertId);
+    if (idx !== -1) {
+      mockAlerts.splice(idx, 1);
+    }
+    res.json({ success: true });
+  }
+});
+
+// API: Dismiss warning as a false positive (System Learning)
+app.post('/api/alerts/:id/dismiss', async (req, res) => {
+  const alertId = req.params.id;
+  console.log(`Request to dismiss alert as false positive: ${alertId}`);
+  if (db) {
+    try {
+      const docRef = db.collection('alerts').doc(alertId);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        const alertData = doc.data();
+        // Save to false_positives collection for prompt-based machine learning
+        await db.collection('false_positives').add({
+          target_text: alertData.target_text,
+          context: alertData.context || [],
+          timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log(`Saved text "${alertData.target_text}" to false_positives for learning.`);
+        // Delete from active alerts list so it disappears from UI
+        await docRef.delete();
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error dismissing alert:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const idx = mockAlerts.findIndex(a => a.id === alertId);
+    if (idx !== -1) {
+      const alertData = mockAlerts[idx];
+      console.log(`Mock learning: Saved false positive: "${alertData.target_text}"`);
+      mockAlerts.splice(idx, 1);
+    }
+    res.json({ success: true });
+  }
+});
+
+// API: Remove kid's name from monitoring (delete all their alerts)
+app.post('/api/kids/delete', async (req, res) => {
+  const { kid_name } = req.body;
+  console.log(`Request to remove kid from monitoring: ${kid_name}`);
+  if (!kid_name) {
+    return res.status(400).json({ error: "Missing kid_name" });
+  }
+
+  if (db) {
+    try {
+      const snapshot = await db.collection('alerts').where('kid_name', '==', kid_name).get();
+      if (!snapshot.empty) {
+        const batch = db.batch();
+        snapshot.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(`Deleted all ${snapshot.size} alerts for kid: ${kid_name}`);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error removing kid alerts from Firestore:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    for (let i = mockAlerts.length - 1; i >= 0; i--) {
+      if (mockAlerts[i].kid_name === kid_name) {
+        mockAlerts.splice(i, 1);
+      }
+    }
+    res.json({ success: true });
+  }
 });
 
 // Serve the Dashboard dashboard page
