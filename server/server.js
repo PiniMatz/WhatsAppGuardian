@@ -81,7 +81,7 @@ const DEFAULT_KEYWORDS = [...mockKeywords];
 // API: Receive a flagged message from kid's phone
 app.post('/api/alerts', async (req, res) => {
   console.log("Incoming alert request:", req.body);
-  const { kid_name, target_text, context } = req.body;
+  const { kid_name, chat_name, sender, target_text, context } = req.body;
   
   if (!kid_name || !target_text) {
     return res.status(400).json({ error: "Missing kid_name or target_text" });
@@ -136,6 +136,8 @@ app.post('/api/alerts', async (req, res) => {
   const alertData = {
     id: 'alert_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
     kid_name,
+    chat_name: chat_name || "וואטסאפ",
+    sender: sender || "לא ידוע",
     target_text,
     context: context || [],
     is_threat: analysis.is_threat || false,

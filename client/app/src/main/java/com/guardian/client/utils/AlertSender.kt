@@ -27,7 +27,13 @@ object AlertSender {
     private val chatContexts = mutableMapOf<String, MutableList<ContextMessage>>()
 
     data class ContextMessage(val sender: String, val text: String)
-    data class AlertPayload(val kid_name: String, val target_text: String, val context: List<ContextMessage>)
+    data class AlertPayload(
+        val kid_name: String,
+        val chat_name: String,
+        val sender: String,
+        val target_text: String,
+        val context: List<ContextMessage>
+    )
 
     /**
      * Adds a message to the local rolling context for a specific chat.
@@ -71,11 +77,11 @@ object AlertSender {
     /**
      * Sends the flagged message with context to the backend.
      */
-    fun sendAlert(context: Context, targetText: String, chatContext: List<ContextMessage>) {
+    fun sendAlert(context: Context, chatName: String, sender: String, targetText: String, chatContext: List<ContextMessage>) {
         val sharedPreferences = context.getSharedPreferences("GuardianPrefs", Context.MODE_PRIVATE)
         val kidName = sharedPreferences.getString("kid_name", "שומר") ?: "שומר"
 
-        val payload = AlertPayload(kidName, targetText, chatContext)
+        val payload = AlertPayload(kidName, chatName, sender, targetText, chatContext)
         val jsonPayload = gson.toJson(payload)
 
         CoroutineScope(Dispatchers.IO).launch {

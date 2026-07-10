@@ -958,18 +958,25 @@
         const alertIdentifier = alert.id || alert.timestamp;
         const isSelected = selectedAlertIds.includes(alertIdentifier);
         const isSaved = alert.saved === true;
+        const isOutgoing = alert.sender === alert.kid_name;
         
         return `
           <div class="alert-card ${alert.category} ${isSaved ? 'saved' : ''}" data-id="${alertIdentifier}">
             <div class="alert-header">
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <input type="checkbox" class="alert-checkbox" data-id="${alertIdentifier}" ${isSelected ? 'checked' : ''} onchange="toggleSelectAlert('${alertIdentifier}', this)" style="width: 1.15rem; height: 1.15rem; cursor: pointer; accent-color: var(--primary);">
-                <span class="kid-badge">${alert.kid_name}</span>
+                <span class="kid-badge" title="הילד המנוטר">${alert.kid_name}</span>
+                ${alert.chat_name ? `<span class="group-badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.25);">💬 ${alert.chat_name}</span>` : ''}
                 ${isSaved ? '<span class="star-badge" title="התרעה שמורה" style="color: #fbbf24; font-size: 1.15rem; margin-right: 0.25rem;">⭐</span>' : ''}
               </div>
               <span class="alert-time">${timeStr}</span>
             </div>
             <div class="alert-body">
+              <div style="margin-bottom: 0.65rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+                <span>נכתב על ידי:</span>
+                <strong style="color: var(--text-main); font-weight: 700;">${alert.sender || 'לא ידוע'}</strong>
+                ${isOutgoing ? `<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-right: 0.25rem;">מכשיר הילד</span>` : ''}
+              </div>
               <div class="alert-time">הודעה שסומנה:</div>
               <div class="target-message">"${alert.target_text}"</div>
               ${alert.explanation_hebrew ? `
@@ -1050,17 +1057,24 @@
         const categoryLabel = CATEGORY_MAP[alert.category] || alert.category;
         const timeStr = new Date(alert.timestamp).toLocaleString('he-IL');
         const alertIdentifier = alert.id || alert.timestamp;
+        const isOutgoing = alert.sender === alert.kid_name;
         
         return `
           <div class="alert-card ${alert.category} saved">
             <div class="alert-header">
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <span class="star-badge" style="color: #fbbf24; font-size: 1.15rem;">⭐</span>
-                <span class="kid-badge">${alert.kid_name}</span>
+                <span class="kid-badge" title="הילד המנוטר">${alert.kid_name}</span>
+                ${alert.chat_name ? `<span class="group-badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.25);">💬 ${alert.chat_name}</span>` : ''}
               </div>
               <span class="alert-time">${timeStr}</span>
             </div>
             <div class="alert-body">
+              <div style="margin-bottom: 0.65rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+                <span>נכתב על ידי:</span>
+                <strong style="color: var(--text-main); font-weight: 700;">${alert.sender || 'לא ידוע'}</strong>
+                ${isOutgoing ? `<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-right: 0.25rem;">מכשיר הילד</span>` : ''}
+              </div>
               <div class="alert-time">הודעה שסומנה:</div>
               <div class="target-message">"${alert.target_text}"</div>
               ${alert.explanation_hebrew ? `

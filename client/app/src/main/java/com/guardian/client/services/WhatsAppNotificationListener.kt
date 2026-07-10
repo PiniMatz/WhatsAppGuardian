@@ -32,7 +32,7 @@ class WhatsAppNotificationListener : NotificationListenerService() {
         if (AlertSender.containsThreatKeyword(text, keywords)) {
             Log.d(TAG, "Notification message triggered keyword filter: $text")
             val contextList = AlertSender.getChatContext(title)
-            AlertSender.sendAlert(applicationContext, text, contextList)
+            AlertSender.sendAlert(applicationContext, title, title, text, contextList)
         }
     }
 }

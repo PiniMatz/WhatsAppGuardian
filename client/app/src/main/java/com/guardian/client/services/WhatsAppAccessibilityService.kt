@@ -153,7 +153,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
                 if (AlertSender.containsThreatKeyword(text, keywords)) {
                     Log.d(TAG, "Triggered keyword filter on text: $text")
                     val chatContext = AlertSender.getChatContext(activeChatTitle)
-                    AlertSender.sendAlert(applicationContext, text, chatContext)
+                    AlertSender.sendAlert(applicationContext, activeChatTitle, sender, text, chatContext)
                 }
             }
         }
