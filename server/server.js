@@ -78,6 +78,17 @@ let mockKeywords = [
 // Default keywords
 const DEFAULT_KEYWORDS = [...mockKeywords];
 
+function isContextEqual(ctx1, ctx2) {
+  if (!ctx1 || !ctx2) return ctx1 === ctx2;
+  if (ctx1.length !== ctx2.length) return false;
+  for (let i = 0; i < ctx1.length; i++) {
+    if (ctx1[i].sender !== ctx2[i].sender || ctx1[i].text !== ctx2[i].text) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // API: Receive a flagged message from kid's phone
 app.post('/api/alerts', async (req, res) => {
   console.log("Incoming alert request:", req.body);
@@ -87,43 +98,65 @@ app.post('/api/alerts', async (req, res) => {
     return res.status(400).json({ error: "Missing kid_name or target_text" });
   }
 
-  // Deduplication Check (Ignore identical alerts from the same kid within the last 5 minutes, extending the window)
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  // Deduplication & Evolving Context Update Logic:
+  // If an alert with the same target_text and kid_name already exists, we update it rather than creating a new card.
   if (db) {
     try {
-      // Single-field query to avoid composite index requirements
       const existingAlerts = await db.collection('alerts')
         .where('target_text', '==', target_text)
         .get();
       
-      const duplicateDoc = existingAlerts.docs.find(doc => {
-        const data = doc.data();
-        const alertTime = data.timestamp && typeof data.timestamp.toDate === 'function'
-          ? data.timestamp.toDate()
-          : new Date(data.timestamp);
-        return data.kid_name === kid_name && alertTime > fiveMinutesAgo;
-      });
+      const duplicateDoc = existingAlerts.docs.find(doc => doc.data().kid_name === kid_name);
 
       if (duplicateDoc) {
-        console.log(`Duplicate alert detected for ${kid_name}: "${target_text}". Extending block window by 5 minutes.`);
-        await duplicateDoc.ref.update({
-          timestamp: admin.firestore.FieldValue.serverTimestamp()
-        });
-        return res.json({ success: true, duplicate: true });
+        const existingData = duplicateDoc.data();
+        const contextChanged = !isContextEqual(existingData.context, context);
+
+        if (contextChanged) {
+          console.log(`Alert context evolved for ${kid_name}: "${target_text}". Re-analyzing with new context.`);
+          const analysis = await analyzeHebrewText(target_text, context || [], db);
+          
+          await duplicateDoc.ref.update({
+            chat_name: chat_name || existingData.chat_name || "וואטסאפ",
+            sender: sender || existingData.sender || "לא ידוע",
+            context: context || [],
+            is_threat: analysis.is_threat || false,
+            category: analysis.category || "none",
+            confidence: analysis.confidence || 0,
+            explanation_hebrew: analysis.explanation_hebrew || "לא זוהה איום",
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          });
+          return res.json({ success: true, updated: true, analysis });
+        } else {
+          console.log(`Duplicate alert event for ${kid_name}: "${target_text}". Context unchanged, extending time window.`);
+          await duplicateDoc.ref.update({
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          });
+          return res.json({ success: true, duplicate: true });
+        }
       }
     } catch (err) {
-      console.error("Error checking duplicates in Firestore:", err.message);
+      console.error("Error updating duplicate/evolving alert in Firestore:", err.message);
     }
   } else {
-    const duplicate = mockAlerts.find(a => 
-      a.kid_name === kid_name && 
-      a.target_text === target_text && 
-      (new Date(a.timestamp) > fiveMinutesAgo)
-    );
+    const duplicate = mockAlerts.find(a => a.kid_name === kid_name && a.target_text === target_text);
     if (duplicate) {
-      console.log(`Duplicate mock alert detected for ${kid_name}: "${target_text}". Extending block window by 5 minutes.`);
-      duplicate.timestamp = new Date().toISOString();
-      return res.json({ success: true, duplicate: true });
+      const contextChanged = !isContextEqual(duplicate.context, context);
+      if (contextChanged) {
+        console.log(`Mock alert context evolved for ${kid_name}: "${target_text}". Re-analyzing in-memory.`);
+        const analysis = await analyzeHebrewText(target_text, context || [], db);
+        duplicate.context = context || [];
+        duplicate.is_threat = analysis.is_threat || false;
+        duplicate.category = analysis.category || "none";
+        duplicate.confidence = analysis.confidence || 0;
+        duplicate.explanation_hebrew = analysis.explanation_hebrew || "לא זוהה איום";
+        duplicate.timestamp = new Date().toISOString();
+        return res.json({ success: true, updated: true, analysis });
+      } else {
+        console.log(`Duplicate mock alert event for ${kid_name}: "${target_text}". Context unchanged.`);
+        duplicate.timestamp = new Date().toISOString();
+        return res.json({ success: true, duplicate: true });
+      }
     }
   }
 
