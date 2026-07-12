@@ -63,12 +63,42 @@ object AlertSender {
 
     /**
      * Checks if a message contains any Hebrew threat keyword.
+     * Uses lightweight stemming heuristics to avoid false positives (e.g., "ענית" triggering on "עני").
      */
     fun containsThreatKeyword(text: String, keywords: List<String>): Boolean {
-        val lowercaseText = text.lowercase()
+        // Split text into words, stripping punctuation
+        val words = text.lowercase().split(Regex("[\\s.,!?;:\"'()#@\\-*_+=~`\\[\\]{}|\\\\<>]+"))
+        
         for (keyword in keywords) {
-            if (lowercaseText.contains(keyword.lowercase())) {
-                return true
+            val kw = keyword.lowercase()
+            if (kw.isEmpty()) continue
+            
+            // For longer phrases or multi-word keywords, normal substring match is safe
+            if (kw.length >= 5 || kw.contains(" ")) {
+                if (text.lowercase().contains(kw)) {
+                    return true
+                }
+            } else {
+                // For short keywords (like "עני", "נכה", "זונה"), match word-by-word with stem/prefix/suffix rules
+                for (word in words) {
+                    if (word == kw) return true
+                    
+                    // Check Hebrew prefixes (ה, ו, ב, ל, מ, ש, כ)
+                    if (word.length > kw.length && (word.startsWith("ה") || word.startsWith("ו") || word.startsWith("ב") || word.startsWith("ל") || word.startsWith("מ") || word.startsWith("ש") || word.startsWith("כ"))) {
+                        val withoutPrefix = word.substring(1)
+                        if (withoutPrefix == kw) return true
+                        
+                        // Check common plural/feminine suffixes combined with prefix (e.g. "והעניים", "שהנכה")
+                        if (withoutPrefix == "${kw}ים" || withoutPrefix == "${kw}ות" || withoutPrefix == "${kw}ה" || withoutPrefix == "${kw}יה") {
+                            return true
+                        }
+                    }
+                    
+                    // Check common suffixes directly on keyword (e.g., "עניים", "עניה", "הומואים")
+                    if (word == "${kw}ים" || word == "${kw}ות" || word == "${kw}ה" || word == "${kw}יה" || word == "${kw}יית" || word == "${kw}אי") {
+                        return true
+                    }
+                }
             }
         }
         return false

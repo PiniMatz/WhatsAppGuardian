@@ -225,19 +225,53 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         }
     }
 
-    /**
-     * Helper to filter out layout elements like status, time, read ticks, etc.
-     */
     private fun isMetadataOrTime(text: String): Boolean {
-        // Match standard WhatsApp timestamps (e.g. 11:34, 11:34 AM, 23:59)
-        val timeRegex = Regex("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9](\\s?(AM|PM))?$")
-        // Match words like "yesterday", "today", read checkmarks, or short numbers
         val cleanText = text.trim()
-        return cleanText.matches(timeRegex) || 
-               cleanText == "אתמול" || 
-               cleanText == "היום" || 
-               cleanText.length <= 1 || 
-               cleanText == "נמסר" || 
-               cleanText == "נקרא"
+        if (cleanText.isEmpty()) return true
+        
+        // 1. Match standard WhatsApp timestamps (e.g. 11:34, 11:34 AM, 23:59)
+        val timeRegex = Regex("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9](\\s?(AM|PM))?$")
+        if (cleanText.matches(timeRegex)) return true
+        
+        // 2. Direct match metadata and system words
+        val ignoredWords = setOf(
+            "אתמול", "היום", "שלשום", "נמסר", "נקרא", "נשלח", "הודעה זו נמחקה", 
+            "הודעה נמחקה", "הוספת", "הסרת", "עזב/ה", "הצטרף/ה", "מידע נוסף",
+            "למידע נוסף", "הקוד המאובטח"
+        )
+        if (ignoredWords.contains(cleanText)) return true
+        
+        // 3. Floating dates (e.g. contain "שלשום", "אתמול", "היום" with extra chars/emojis)
+        if (cleanText.contains("שלשום") || cleanText.contains("אתמול") || cleanText.contains("היום")) {
+            if (cleanText.length < 15) return true
+        }
+
+        // 4. System texts containing security warnings
+        if (cleanText.contains("מוצפן מקצה לקצה") || 
+            cleanText.contains("הוגדרה פרטיות מוגברת") || 
+            cleanText.contains("לפרופיל ולמספר הטלפון") ||
+            cleanText.contains("ההצפנה מקצה לקצה")) {
+            return true
+        }
+
+        // 5. Hebrew date formats (e.g., "8 ביולי", "24 בדצמבר", "8 ביולי, 15:47")
+        val hebrewMonths = listOf(
+            "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
+            "בינואר", "בפברואר", "במרץ", "באפריל", "במאי", "ביוני", "ביולי", "באוגוסט", "בספטמבר", "באוקטובר", "בנובמבר", "בדצמבר"
+        )
+        for (month in hebrewMonths) {
+            if (cleanText.contains(month)) {
+                if (cleanText.length < 25) return true
+            }
+        }
+
+        // 6. Numerical date patterns (e.g. 08/07/2026, 08.07.26, 8.7.2026)
+        val dateRegex = Regex("^\\d{1,2}[./. -]\\d{1,2}[./. -]\\d{2,4}(.*)?$")
+        if (cleanText.matches(dateRegex)) return true
+        
+        // 7. Very short garbage texts or standalone single characters
+        if (cleanText.length <= 1) return true
+
+        return false
     }
 }
