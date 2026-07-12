@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
         tvStatus = findViewById(R.id.tv_status)
 
         // Load existing name if saved
-        val sharedPreferences = getSharedPreferences("GuardianPrefs", Context.MODE_PRIVATE)
+        val sharedPreferences = getSharedPreferences("GuardianPrefs", MODE_PRIVATE)
         val savedName = sharedPreferences.getString("kid_name", "")
         if (!TextUtils.isEmpty(savedName)) {
             etKidName.setText(savedName)
@@ -91,7 +91,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isAccessibilityServiceEnabled(context: Context, service: Class<*>): Boolean {
-        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val am = context.getSystemService(ACCESSIBILITY_SERVICE) as AccessibilityManager
         val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
         for (enabledService in enabledServices) {
             val enabledServiceInfo = enabledService.resolveInfo.serviceInfo
