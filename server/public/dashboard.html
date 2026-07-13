@@ -338,11 +338,20 @@
       border-bottom-left-radius: 2px;
     }
 
-    .chat-bubble.flagged {
+    .chat-bubble.flagged-kid {
       background: var(--accent-danger);
       color: white;
       align-self: flex-end;
       border-bottom-left-radius: 2px;
+      font-weight: 700;
+    }
+
+    .chat-bubble.flagged-peer {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid var(--accent-danger);
+      color: #fca5a5;
+      align-self: flex-start;
+      border-bottom-right-radius: 2px;
       font-weight: 700;
     }
 
@@ -1023,9 +1032,13 @@
       }
 
       // Render the flagged message at the end
+      const isFlaggedOutgoing = alert.sender === alert.kid_name;
+      const flaggedClass = isFlaggedOutgoing ? 'flagged-kid' : 'flagged-peer';
+      const senderNameLabel = isFlaggedOutgoing ? `${alert.kid_name} (סומן)` : `${alert.sender || 'הצד השני'} (סומן)`;
+      
       chatContainer.innerHTML += `
-        <div class="chat-bubble flagged">
-          <strong>${alert.kid_name} (סומן):</strong> ${alert.target_text}
+        <div class="chat-bubble ${flaggedClass}">
+          <strong>${senderNameLabel}:</strong> ${alert.target_text}
         </div>
       `;
 
