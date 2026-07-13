@@ -12,6 +12,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.edit
 import androidx.appcompat.app.AppCompatActivity
 import com.guardian.client.services.WhatsAppAccessibilityService
 
@@ -45,7 +46,7 @@ class MainActivity : AppCompatActivity() {
             if (TextUtils.isEmpty(name)) {
                 Toast.makeText(this, "אנא הזן שם ילד תקין", Toast.LENGTH_SHORT).show()
             } else {
-                sharedPreferences.edit().putString("kid_name", name).apply()
+                sharedPreferences.edit { putString("kid_name", name) }
                 Toast.makeText(this, "שם הילד נשמר בהצלחה: $name", Toast.LENGTH_SHORT).show()
             }
         }
