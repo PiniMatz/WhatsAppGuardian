@@ -170,32 +170,51 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     private fun getSenderName(node: AccessibilityNodeInfo, activeChat: String, kidName: String): String {
         val parent = node.parent
         if (parent != null) {
-            val bounds = Rect()
-            node.getBoundsInScreen(bounds)
+            val name = findNameInContainer(parent, node)
+            if (name != null) {
+                parent.recycle()
+                return name
+            }
             
-            // Search sibling TextViews in the bubble to see if there is a name tag at the top
-            for (i in 0 until parent.childCount) {
-                val child = parent.getChild(i) ?: continue
-                if (child.className == "android.widget.TextView") {
-                    val childText = child.text?.toString()?.trim() ?: ""
-                    if (childText.isNotEmpty() && !isMetadataOrTime(childText) && childText != node.text?.toString()?.trim()) {
-                        val childBounds = Rect()
-                        child.getBoundsInScreen(childBounds)
-                        // In WhatsApp group layouts, the sender's name is placed strictly above the message text
-                        if (childBounds.top < bounds.top && childBounds.left >= bounds.left - 50) {
-                            val name = childText
-                            child.recycle()
-                            parent.recycle()
-                            return name
-                        }
-                    }
+            // Fallback: Check grandparent siblings (for nested layout structures)
+            val grandparent = parent.parent
+            if (grandparent != null) {
+                val gpName = findNameInContainer(grandparent, node)
+                if (gpName != null) {
+                    grandparent.recycle()
+                    parent.recycle()
+                    return gpName
                 }
-                child.recycle()
+                grandparent.recycle()
             }
             parent.recycle()
         }
         
         return deduceDefaultSender(node, activeChat, kidName)
+    }
+
+    private fun findNameInContainer(container: AccessibilityNodeInfo, targetNode: AccessibilityNodeInfo): String? {
+        val bounds = Rect()
+        targetNode.getBoundsInScreen(bounds)
+        
+        for (i in 0 until container.childCount) {
+            val child = container.getChild(i) ?: continue
+            if (child.className == "android.widget.TextView") {
+                val childText = child.text?.toString()?.trim() ?: ""
+                if (childText.isNotEmpty() && !isMetadataOrTime(childText) && childText != targetNode.text?.toString()?.trim()) {
+                    val childBounds = Rect()
+                    child.getBoundsInScreen(childBounds)
+                    // Sender's name is placed strictly above the message text vertically
+                    if (childBounds.top < bounds.top && childBounds.left >= bounds.left - 100) {
+                        val name = childText
+                        child.recycle()
+                        return name
+                    }
+                }
+            }
+            child.recycle()
+        }
+        return null
     }
 
     /**
@@ -204,9 +223,16 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     private fun deduceDefaultSender(node: AccessibilityNodeInfo, activeChat: String, kidName: String): String {
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
-        // Heuristic: Outgoing bubbles are aligned to the left/right edges depending on RTL settings.
-        // Usually, in Hebrew/RTL system layout, outgoing bubbles (sent by kid) are on the left (< 250px).
-        return if (bounds.left < 250) kidName else "הצד השני"
+        return if (bounds.left < 250) {
+            kidName
+        } else {
+            // Resolve 1-on-1 contact name if available, fallback to general descriptor
+            if (activeChat.isNotEmpty() && activeChat != "וואטסאפ" && activeChat != "WhatsApp") {
+                activeChat
+            } else {
+                "הצד השני"
+            }
+        }
     }
 
     /**
