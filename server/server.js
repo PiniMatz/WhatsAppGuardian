@@ -211,7 +211,7 @@ app.get('/api/alerts', async (req, res) => {
         if (data.timestamp && typeof data.timestamp.toDate === 'function') {
           data.timestamp = data.timestamp.toDate().toISOString();
         }
-        alerts.push({ id: doc.id, ...data });
+        alerts.push({ ...data, id: doc.id });
       });
       return res.json(alerts);
     } catch (err) {
