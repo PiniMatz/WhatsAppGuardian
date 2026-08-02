@@ -259,7 +259,14 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         val timeRegex = Regex("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9](\\s?(AM|PM))?$")
         if (cleanText.matches(timeRegex)) return true
         
-        // 2. Direct match metadata and system words
+        // 2. Match standalone phone numbers (e.g. +972 51-504-0682, 050-1234567, etc.)
+        val phoneRegex = Regex("^\\+?[0-9\\s\\-()]{7,20}$")
+        if (cleanText.matches(phoneRegex)) return true
+
+        // 3. Match WhatsApp contact name formats containing '~' (e.g. "Nadav sobel ~", "~Nadav")
+        if (cleanText.contains("~")) return true
+
+        // 4. Direct match metadata and system words
         val ignoredWords = setOf(
             "אתמול", "היום", "שלשום", "נמסר", "נקרא", "נשלח", "הודעה זו נמחקה", 
             "הודעה נמחקה", "הוספת", "הסרת", "עזב/ה", "הצטרף/ה", "מידע נוסף",
@@ -267,12 +274,12 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         )
         if (ignoredWords.contains(cleanText)) return true
         
-        // 3. Floating dates (e.g. contain "שלשום", "אתמול", "היום" with extra chars/emojis)
+        // 5. Floating dates (e.g. contain "שלשום", "אתמול", "היום" with extra chars/emojis)
         if (cleanText.contains("שלשום") || cleanText.contains("אתמול") || cleanText.contains("היום")) {
             if (cleanText.length < 15) return true
         }
 
-        // 4. System texts containing security warnings
+        // 6. System texts containing security warnings
         if (cleanText.contains("מוצפן מקצה לקצה") || 
             cleanText.contains("הוגדרה פרטיות מוגברת") || 
             cleanText.contains("לפרופיל ולמספר הטלפון") ||
@@ -280,7 +287,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             return true
         }
 
-        // 5. Hebrew date formats (e.g., "8 ביולי", "24 בדצמבר", "8 ביולי, 15:47")
+        // 7. Hebrew date formats (e.g., "8 ביולי", "24 בדצמבר", "8 ביולי, 15:47")
         val hebrewMonths = listOf(
             "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
             "בינואר", "בפברואר", "במרץ", "באפריל", "במאי", "ביוני", "ביולי", "באוגוסט", "בספטמבר", "באוקטובר", "בנובמבר", "בדצמבר"
@@ -291,11 +298,43 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 6. Numerical date patterns (e.g. 08/07/2026, 08.07.26, 8.7.2026)
+        // 8. Numerical date patterns (e.g. 08/07/2026, 08.07.26, 8.7.2026)
         val dateRegex = Regex("^\\d{1,2}[./. -]\\d{1,2}[./. -]\\d{2,4}(.*)?$")
         if (cleanText.matches(dateRegex)) return true
         
-        // 7. Very short garbage texts or standalone single characters
+        // 9. Unread messages indicators (e.g. "2 הודעות שלא נקראו", "הודעה שלא נקראה")
+        if (cleanText.contains("הודעות שלא נקראו") || 
+            cleanText.contains("הודעה שלא נקראה") || 
+            cleanText.contains("הודעה חדשה") || 
+            cleanText.contains("הודעות חדשות") || 
+            cleanText.contains("unread message") || 
+            cleanText.contains("unread messages")) {
+            return true
+        }
+
+        // 10. Status/Group info indicators (e.g. "10 מחוברים", "מחובר/ת", "הקלידו...")
+        if (cleanText.contains("מחוברים") || 
+            cleanText.contains("עוקבים") || 
+            cleanText.contains("נראה לאחרונה") || 
+            cleanText.contains("הקלידו") || 
+            cleanText.contains("typing") || 
+            cleanText.contains("online") || 
+            cleanText.equals("מחובר/ת") || 
+            cleanText.equals("מחובר") || 
+            cleanText.equals("typing...")) {
+            return true
+        }
+
+        // 11. WhatsApp system overlay actions (e.g. "הוספת תג החבר שלך", "שלח הודעה")
+        if (cleanText.contains("הוספת תג") || 
+            cleanText.contains("תג החבר שלך") || 
+            cleanText.contains("הודעות זמניות") ||
+            cleanText.contains("הצגת אנשי קשר") ||
+            cleanText.contains("הצגת קבוצה")) {
+            return true
+        }
+
+        // 12. Very short garbage texts or standalone single characters
         if (cleanText.length <= 1) return true
 
         return false
