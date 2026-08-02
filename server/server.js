@@ -89,6 +89,41 @@ function isContextEqual(ctx1, ctx2) {
   return true;
 }
 
+function normalizeText(text) {
+  if (!text) return "";
+  // 1. Remove emojis and symbols
+  let clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F018}-\u{1F0F5}\u{2600}-\u{26FF}]/gu, '');
+  // 2. Remove Hebrew niqqud (vowels)
+  clean = clean.replace(/[\u0591-\u05C7]/g, "");
+  // 3. Keep only alphanumeric chars (Hebrew, English, digits)
+  clean = clean.replace(/[^\u05D0-\u05EAa-zA-Z0-9]/g, "");
+  // 4. Convert to lowercase
+  return clean.toLowerCase();
+}
+
+function isDuplicateText(text1, text2) {
+  const norm1 = normalizeText(text1);
+  const norm2 = normalizeText(text2);
+  if (!norm1 || !norm2) return false;
+  
+  if (norm1 === norm2) return true;
+  
+  // If one is a substring of the other (evolved or slightly scrolled/truncated text)
+  if (norm1.includes(norm2) || norm2.includes(norm1)) {
+    const minLen = Math.min(norm1.length, norm2.length);
+    const maxLen = Math.max(norm1.length, norm2.length);
+    // At least 60% length match
+    if (minLen >= maxLen * 0.6) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// In-memory active request registry to prevent race condition duplicates arriving within milliseconds
+const activeRequests = new Set();
+
 // API: Receive a flagged message from kid's phone
 app.post('/api/alerts', async (req, res) => {
   console.log("Incoming alert request:", req.body);
@@ -98,105 +133,137 @@ app.post('/api/alerts', async (req, res) => {
     return res.status(400).json({ error: "Missing kid_name or target_text" });
   }
 
-  // Deduplication & Evolving Context Update Logic:
-  // If an alert with the same target_text and kid_name already exists, we update it rather than creating a new card.
-  if (db) {
-    try {
-      const existingAlerts = await db.collection('alerts')
-        .where('target_text', '==', target_text)
-        .get();
-      
-      const duplicateDoc = existingAlerts.docs.find(doc => doc.data().kid_name === kid_name);
+  // Generate a key for this alert to prevent race condition
+  const normalizedTarget = normalizeText(target_text);
+  const requestKey = `${kid_name}_${normalizedTarget.substring(0, 100)}`; // limit key length
+  
+  if (activeRequests.has(requestKey)) {
+    console.log(`Race condition duplicate caught in memory for: ${requestKey}`);
+    return res.json({ success: true, duplicate: true, note: "inflight duplicate caught" });
+  }
+  
+  activeRequests.add(requestKey);
 
-      if (duplicateDoc) {
-        const existingData = duplicateDoc.data();
-        const contextChanged = !isContextEqual(existingData.context, context);
+  try {
+    // Deduplication & Evolving Context Update Logic:
+    // If an alert with the same target_text (or highly similar normalized text) and kid_name already exists, we update it rather than creating a new card.
+    if (db) {
+      try {
+        // Query the 30 most recent alerts (single field timestamp desc is highly efficient and already indexed)
+        const existingAlertsSnapshot = await db.collection('alerts')
+          .orderBy('timestamp', 'desc')
+          .limit(30)
+          .get();
+        
+        const duplicateDoc = existingAlertsSnapshot.docs.find(doc => {
+          const data = doc.data();
+          return data.kid_name === kid_name && isDuplicateText(data.target_text, target_text);
+        });
 
-        if (contextChanged) {
-          console.log(`Alert context evolved for ${kid_name}: "${target_text}". Re-analyzing with new context.`);
-          const analysis = await analyzeHebrewText(target_text, context || [], db);
+        if (duplicateDoc) {
+          const existingData = duplicateDoc.data();
+          const isNewTextLonger = target_text.length > existingData.target_text.length;
+          const contextChanged = !isContextEqual(existingData.context, context);
           
-          await duplicateDoc.ref.update({
-            chat_name: chat_name || existingData.chat_name || "וואטסאפ",
-            sender: sender || existingData.sender || "לא ידוע",
-            context: context || [],
-            is_threat: analysis.is_threat || false,
-            category: analysis.category || "none",
-            confidence: analysis.confidence || 0,
-            explanation_hebrew: analysis.explanation_hebrew || "לא זוהה איום",
-            timestamp: admin.firestore.FieldValue.serverTimestamp()
-          });
+          const textToKeep = isNewTextLonger ? target_text : existingData.target_text;
+
+          if (contextChanged || isNewTextLonger) {
+            console.log(`Alert context/text evolved for ${kid_name}: "${textToKeep}". Re-analyzing.`);
+            const analysis = await analyzeHebrewText(textToKeep, context || [], db);
+            
+            await duplicateDoc.ref.update({
+              chat_name: chat_name || existingData.chat_name || "וואטסאפ",
+              sender: sender || existingData.sender || "לא ידוע",
+              target_text: textToKeep,
+              context: context || [],
+              is_threat: analysis.is_threat || false,
+              category: analysis.category || "none",
+              confidence: analysis.confidence || 0,
+              explanation_hebrew: analysis.explanation_hebrew || "לא זוהה איום",
+              timestamp: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return res.json({ success: true, updated: true, analysis });
+          } else {
+            console.log(`Duplicate alert event for ${kid_name}: "${target_text}". Context unchanged, extending time window.`);
+            await duplicateDoc.ref.update({
+              timestamp: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return res.json({ success: true, duplicate: true });
+          }
+        }
+      } catch (err) {
+        console.error("Error updating duplicate/evolving alert in Firestore:", err.message);
+      }
+    } else {
+      const duplicate = mockAlerts.find(a => a.kid_name === kid_name && isDuplicateText(a.target_text, target_text));
+      if (duplicate) {
+        const isNewTextLonger = target_text.length > duplicate.target_text.length;
+        const contextChanged = !isContextEqual(duplicate.context, context);
+        
+        const textToKeep = isNewTextLonger ? target_text : duplicate.target_text;
+
+        if (contextChanged || isNewTextLonger) {
+          console.log(`Mock alert context/text evolved for ${kid_name}: "${textToKeep}". Re-analyzing.`);
+          const analysis = await analyzeHebrewText(textToKeep, context || [], db);
+          duplicate.target_text = textToKeep;
+          duplicate.context = context || [];
+          duplicate.is_threat = analysis.is_threat || false;
+          duplicate.category = analysis.category || "none";
+          duplicate.confidence = analysis.confidence || 0;
+          duplicate.explanation_hebrew = analysis.explanation_hebrew || "לא זוהה איום";
+          duplicate.timestamp = new Date().toISOString();
           return res.json({ success: true, updated: true, analysis });
         } else {
-          console.log(`Duplicate alert event for ${kid_name}: "${target_text}". Context unchanged, extending time window.`);
-          await duplicateDoc.ref.update({
-            timestamp: admin.firestore.FieldValue.serverTimestamp()
-          });
+          console.log(`Duplicate mock alert event for ${kid_name}: "${target_text}". Context unchanged.`);
+          duplicate.timestamp = new Date().toISOString();
           return res.json({ success: true, duplicate: true });
         }
       }
-    } catch (err) {
-      console.error("Error updating duplicate/evolving alert in Firestore:", err.message);
     }
-  } else {
-    const duplicate = mockAlerts.find(a => a.kid_name === kid_name && a.target_text === target_text);
-    if (duplicate) {
-      const contextChanged = !isContextEqual(duplicate.context, context);
-      if (contextChanged) {
-        console.log(`Mock alert context evolved for ${kid_name}: "${target_text}". Re-analyzing in-memory.`);
-        const analysis = await analyzeHebrewText(target_text, context || [], db);
-        duplicate.context = context || [];
-        duplicate.is_threat = analysis.is_threat || false;
-        duplicate.category = analysis.category || "none";
-        duplicate.confidence = analysis.confidence || 0;
-        duplicate.explanation_hebrew = analysis.explanation_hebrew || "לא זוהה איום";
-        duplicate.timestamp = new Date().toISOString();
-        return res.json({ success: true, updated: true, analysis });
-      } else {
-        console.log(`Duplicate mock alert event for ${kid_name}: "${target_text}". Context unchanged.`);
-        duplicate.timestamp = new Date().toISOString();
-        return res.json({ success: true, duplicate: true });
+
+    console.log(`Received flagged text from ${kid_name}: "${target_text}"`);
+
+    // Analyze text using Gemini LLM
+    const analysis = await analyzeHebrewText(target_text, context || [], db);
+    console.log("Analysis Result:", analysis);
+
+    const alertData = {
+      id: 'alert_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      kid_name,
+      chat_name: chat_name || "וואטסאפ",
+      sender: sender || "לא ידוע",
+      target_text,
+      context: context || [],
+      is_threat: analysis.is_threat || false,
+      category: analysis.category || "none",
+      confidence: analysis.confidence || 0,
+      explanation_hebrew: analysis.explanation_hebrew || "לא זוהה איום",
+      timestamp: new Date().toISOString()
+    };
+
+    // Save Alert to database
+    if (db) {
+      try {
+        // Add serverTimestamp
+        alertData.timestamp = admin.firestore.FieldValue.serverTimestamp();
+        const docRef = await db.collection('alerts').add(alertData);
+        console.log(`Alert saved to Firestore with ID: ${docRef.id}`);
+      } catch (err) {
+        console.error("Failed to save alert to Firestore:", err.message);
+        mockAlerts.push(alertData);
       }
-    }
-  }
-
-  console.log(`Received flagged text from ${kid_name}: "${target_text}"`);
-
-  // Analyze text using Gemini LLM
-  const analysis = await analyzeHebrewText(target_text, context || [], db);
-  console.log("Analysis Result:", analysis);
-
-  const alertData = {
-    id: 'alert_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-    kid_name,
-    chat_name: chat_name || "וואטסאפ",
-    sender: sender || "לא ידוע",
-    target_text,
-    context: context || [],
-    is_threat: analysis.is_threat || false,
-    category: analysis.category || "none",
-    confidence: analysis.confidence || 0,
-    explanation_hebrew: analysis.explanation_hebrew || "לא זוהה איום",
-    timestamp: new Date().toISOString()
-  };
-
-  // Save Alert to database
-  if (db) {
-    try {
-      // Add serverTimestamp
-      alertData.timestamp = admin.firestore.FieldValue.serverTimestamp();
-      const docRef = await db.collection('alerts').add(alertData);
-      console.log(`Alert saved to Firestore with ID: ${docRef.id}`);
-    } catch (err) {
-      console.error("Failed to save alert to Firestore:", err.message);
+    } else {
       mockAlerts.push(alertData);
+      console.log("Saved alert to local mock database (Firebase is offline).");
     }
-  } else {
-    mockAlerts.push(alertData);
-    console.log("Saved alert to local mock database (Firebase is offline).");
-  }
 
-  res.json({ success: true, analysis });
+    res.json({ success: true, analysis });
+  } finally {
+    // Release in-flight lock after 5 seconds
+    setTimeout(() => {
+      activeRequests.delete(requestKey);
+    }, 5000);
+  }
 });
 
 // API: Get alerts list (for Dashboard fallback/query)
