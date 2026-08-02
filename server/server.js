@@ -46,7 +46,8 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
 
 // In-memory mock database for fallback
 const mockAlerts = [];
-let mockKeywords = [
+// Default keywords configuration
+const DEFAULT_KEYWORDS = [
   // Physical violence & Threats
   "מכות", "להרוג", "נדקור", "סכין", "לרצוח", "אשבור לך", "נביא לך", 
   "לפוצץ אותך", "ניפגש בחוץ", "נרביץ", "אגרוף", "כאפה", "כאפות", "לכסח",
@@ -75,8 +76,7 @@ let mockKeywords = [
   "הומו", "קוקסינל", "לסבית", "זונה", "שרמוטה", "בן זונה", "בת זונה", "כלבה", "כלב"
 ];
 
-// Default keywords
-const DEFAULT_KEYWORDS = [...mockKeywords];
+let mockKeywords = [...DEFAULT_KEYWORDS];
 
 function isContextEqual(ctx1, ctx2) {
   if (!ctx1 || !ctx2) return ctx1 === ctx2;
@@ -557,11 +557,6 @@ app.post('/api/config/keywords/reset', async (req, res) => {
   }
   mockKeywords = [...DEFAULT_KEYWORDS];
   res.json({ success: true, keywords: DEFAULT_KEYWORDS });
-});
-
-// Serve the Dashboard dashboard page
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 app.listen(PORT, () => {
