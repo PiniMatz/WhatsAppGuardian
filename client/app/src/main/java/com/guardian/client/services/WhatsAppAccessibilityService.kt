@@ -204,8 +204,9 @@ class WhatsAppAccessibilityService : AccessibilityService() {
                 if (childText.isNotEmpty() && !isMetadataOrTime(childText) && childText != targetNode.text?.toString()?.trim()) {
                     val childBounds = Rect()
                     child.getBoundsInScreen(childBounds)
-                    // Sender's name is placed strictly above the message text vertically
-                    if (childBounds.top < bounds.top && childBounds.left >= bounds.left - 100) {
+                    // Sender's name is strictly above the message text vertically
+                    // And overlaps horizontally (works for both LTR/RTL and varying text lengths)
+                    if (childBounds.top < bounds.top && childBounds.left < bounds.right && childBounds.right > bounds.left) {
                         val name = childText
                         child.recycle()
                         return name
