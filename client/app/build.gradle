@@ -3,6 +3,19 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// Values injected by CI (GitHub Actions) or ~/.gradle/gradle.properties; sensible defaults for local builds.
+def envOrProp = { String name, String fallback ->
+    def v = System.getenv(name) ?: (project.findProperty(name) as String)
+    return (v != null && !v.trim().isEmpty()) ? v.trim() : fallback
+}
+
+def appVersionCode = envOrProp('VERSION_CODE', '2').toInteger()
+def appVersionBase = '1.1'
+def serverUrl = envOrProp('SERVER_URL', 'https://whatsappguardian.onrender.com')
+def deviceToken = envOrProp('DEVICE_TOKEN', '')
+
+def keystorePath = envOrProp('KEYSTORE_FILE', '')
+
 android {
     namespace 'com.guardian.client'
     compileSdk 34
@@ -11,16 +24,38 @@ android {
         applicationId "com.guardian.client"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName "${appVersionBase}.${appVersionCode}".toString()
+
+        buildConfigField "String", "SERVER_URL", "\"${serverUrl}\""
+        buildConfigField "String", "DEVICE_TOKEN", "\"${deviceToken}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        // Fixed signing key so every build can be installed over the previous one without uninstalling.
+        if (!keystorePath.isEmpty()) {
+            release {
+                storeFile file(keystorePath)
+                storePassword envOrProp('KEYSTORE_PASSWORD', '')
+                keyAlias envOrProp('KEY_ALIAS', '')
+                keyPassword envOrProp('KEY_PASSWORD', '')
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (!keystorePath.isEmpty()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     compileOptions {
@@ -37,13 +72,13 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    
+
     // OkHttp for network requests
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    
+
     // GSON for JSON serialization
     implementation 'com.google.code.gson:gson:2.10.1'
-    
+
     // Coroutines for background tasks
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 }

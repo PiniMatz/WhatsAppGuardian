@@ -117,6 +117,35 @@
             android:layout_marginTop="16dp"
             android:textSize="14sp"/>
 
+        <Button
+            android:id="@+id/btn_battery"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="#475569"
+            android:text="מנע עצירת השירות (חיסכון בסוללה)"
+            android:textColor="#ffffff"/>
+
+        <Button
+            android:id="@+id/btn_test_connection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="#0d9488"
+            android:text="בדיקת חיבור לשרת"
+            android:textColor="#ffffff"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tv_diag"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="#94a3b8"
+            android:textSize="12sp"
+            android:gravity="right"
+            android:textDirection="rtl"/>
+
         <!-- Help / Setup Instructions Card -->
         <LinearLayout
             android:layout_width="match_parent"

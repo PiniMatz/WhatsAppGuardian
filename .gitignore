@@ -16,3 +16,14 @@
 captures/
 *.iml
 .DS_Store
+
+# Release signing key + generated secrets (NEVER commit)
+release-secrets/
+*.jks
+*.keystore
+
+# Temporary review copy
+review/
+
+# Local server test installs
+server/node_modules/

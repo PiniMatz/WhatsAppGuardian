@@ -806,6 +806,10 @@
       </div>
     </section>
   </main>
+  <footer style="text-align:center; padding: 1rem; color: var(--text-muted); font-size: 0.8rem;">
+    <span id="status-line"></span>
+    <button id="test-telegram-btn" onclick="sendTestNotification()" style="display:none; margin-inline-start: 0.75rem; background: transparent; color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); padding: 0.2rem 0.6rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.8rem;">שלח הודעת בדיקה</button>
+  </footer>
 
   <!-- Modal for Conversation Context -->
   <div id="context-modal" class="modal" onclick="closeModal(event)">
@@ -824,6 +828,15 @@
     let keywords = [];
     let alerts = [];
     let currentKidFilter = 'all';
+    let alertsVersion = null;
+
+    // --- Safety helpers: all server/child-supplied text must go through esc() before innerHTML ---
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function catClass(c) {
+      return ['physical_violence', 'cyberbullying', 'self_harm', 'none'].includes(c) ? c : 'none';
+    }
 
     // Switch between dashboard panels
     function switchTab(tabId) {
@@ -842,11 +855,17 @@
       }
     }
 
-    // Fetch alerts from API
-    async function loadAlerts() {
+    // Fetch alerts from API. The server answers {unchanged:true} (no database read) when nothing changed.
+    async function loadAlerts(force) {
       try {
-        const res = await fetch('/api/alerts');
-        alerts = await res.json();
+        const url = (!force && alertsVersion) ? '/api/alerts?v=' + encodeURIComponent(alertsVersion) : '/api/alerts';
+        const res = await fetch(url);
+        if (res.status === 401) { location.reload(); return; }
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.unchanged) return;
+        alertsVersion = data.version;
+        alerts = data.alerts || [];
         updateStatsAndFilters();
         renderAlerts();
         renderSavedAlerts();
@@ -907,7 +926,7 @@
       uniqueKids.forEach(kid => {
         chipsHtml += `
           <button class="filter-chip ${currentKidFilter === kid ? 'active' : ''}" 
-                  onclick="setKidFilter('${kid}')">${kid}</button>
+                  data-kid="${esc(kid)}" onclick="setKidFilter(this.dataset.kid)">${esc(kid)}</button>
         `;
       });
 
@@ -970,12 +989,12 @@
         const isOutgoing = alert.sender === alert.kid_name;
         
         return `
-          <div class="alert-card ${alert.category} ${isSaved ? 'saved' : ''}" data-id="${alertIdentifier}">
+          <div class="alert-card ${catClass(alert.category)} ${isSaved ? 'saved' : ''}" data-id="${esc(alertIdentifier)}">
             <div class="alert-header">
               <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                <input type="checkbox" class="alert-checkbox" data-id="${alertIdentifier}" ${isSelected ? 'checked' : ''} onchange="toggleSelectAlert('${alertIdentifier}', this)" style="width: 1.15rem; height: 1.15rem; cursor: pointer; accent-color: var(--primary);">
-                <span class="kid-badge" title="הילד המנוטר">${alert.kid_name}</span>
-                ${alert.chat_name ? `<span class="group-badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.25);">💬 ${alert.chat_name}</span>` : ''}
+                <input type="checkbox" class="alert-checkbox" data-id="${esc(alertIdentifier)}" ${isSelected ? 'checked' : ''} onchange="toggleSelectAlert(this.dataset.id, this)" style="width: 1.15rem; height: 1.15rem; cursor: pointer; accent-color: var(--primary);">
+                <span class="kid-badge" title="הילד המנוטר">${esc(alert.kid_name)}</span>
+                ${alert.chat_name ? `<span class="group-badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.25);">💬 ${esc(alert.chat_name)}</span>` : ''}
                 ${isSaved ? '<span class="star-badge" title="התרעה שמורה" style="color: #fbbf24; font-size: 1.15rem; margin-right: 0.25rem;">⭐</span>' : ''}
               </div>
               <span class="alert-time">${timeStr}</span>
@@ -983,25 +1002,25 @@
             <div class="alert-body">
               <div style="margin-bottom: 0.65rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
                 <span>נכתב על ידי:</span>
-                <strong style="color: var(--text-main); font-weight: 700;">${alert.sender || 'לא ידוע'}</strong>
+                <strong style="color: var(--text-main); font-weight: 700;">${esc(alert.sender || 'לא ידוע')}</strong>
                 ${isOutgoing ? `<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-right: 0.25rem;">מכשיר הילד</span>` : ''}
               </div>
               <div class="alert-time">הודעה שסומנה:</div>
-              <div class="target-message">"${alert.target_text}"</div>
+              <div class="target-message">"${esc(alert.target_text)}"</div>
               ${alert.explanation_hebrew ? `
                 <div class="explanation-box">
                   <span>💡</span>
-                  <span><strong>ניתוח AI:</strong> ${alert.explanation_hebrew}</span>
+                  <span><strong>ניתוח AI:</strong> ${esc(alert.explanation_hebrew)}</span>
                 </div>
               ` : ''}
             </div>
             <div class="alert-footer">
-              <span class="threat-tag ${alert.category}">${categoryLabel} (רמת זיהוי: ${Math.round(alert.confidence * 100)}%)</span>
-              <button class="context-btn" onclick="openContextModal('${alertIdentifier}')">הצג שיחה מלאה</button>
+              <span class="threat-tag ${catClass(alert.category)}">${esc(categoryLabel)} (רמת זיהוי: ${Math.round(alert.confidence * 100)}%)</span>
+              <button class="context-btn" data-id="${esc(alertIdentifier)}" onclick="openContextModal(this.dataset.id)">הצג שיחה מלאה</button>
             </div>
             <div class="alert-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; border-top: 1px dashed var(--card-border); padding-top: 0.75rem;">
-              <button onclick="deleteAlert('${alertIdentifier}')" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🗑️ מחק התרעה</button>
-              <button onclick="dismissAlertAsFalse('${alertIdentifier}')" style="background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">⚙️ זוהה בטעות (למידה)</button>
+              <button data-id="${esc(alertIdentifier)}" onclick="deleteAlert(this.dataset.id)" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🗑️ מחק התרעה</button>
+              <button data-id="${esc(alertIdentifier)}" onclick="dismissAlertAsFalse(this.dataset.id)" style="background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">⚙️ זוהה בטעות (למידה)</button>
             </div>
           </div>
         `;
@@ -1014,7 +1033,7 @@
       if (!alert) return;
 
       const chatContainer = document.getElementById('chat-bubbles');
-      document.getElementById('modal-title').innerText = `הקשר שיחה עבור ${alert.kid_name}`;
+      document.getElementById('modal-title').innerText = `הקשר שיחה עבור ${esc(alert.kid_name)}`;
       
       chatContainer.innerHTML = '';
       
@@ -1025,7 +1044,7 @@
           const bubbleClass = isKid ? 'kid' : 'peer';
           chatContainer.innerHTML += `
             <div class="chat-bubble ${bubbleClass}">
-              <strong>${msg.sender}:</strong> ${msg.text}
+              <strong>${esc(msg.sender)}:</strong> ${esc(msg.text)}
             </div>
           `;
         });
@@ -1034,11 +1053,11 @@
       // Render the flagged message at the end
       const isFlaggedOutgoing = alert.sender === alert.kid_name;
       const flaggedClass = isFlaggedOutgoing ? 'flagged-kid' : 'flagged-peer';
-      const senderNameLabel = isFlaggedOutgoing ? `${alert.kid_name} (סומן)` : `${alert.sender || 'הצד השני'} (סומן)`;
+      const senderNameLabel = isFlaggedOutgoing ? `${esc(alert.kid_name)} (סומן)` : `${alert.sender || 'הצד השני'} (סומן)`;
       
       chatContainer.innerHTML += `
         <div class="chat-bubble ${flaggedClass}">
-          <strong>${senderNameLabel}:</strong> ${alert.target_text}
+          <strong>${esc(senderNameLabel)}:</strong> ${esc(alert.target_text)}
         </div>
       `;
 
@@ -1073,37 +1092,37 @@
         const isOutgoing = alert.sender === alert.kid_name;
         
         return `
-          <div class="alert-card ${alert.category} saved">
+          <div class="alert-card ${catClass(alert.category)} saved">
             <div class="alert-header">
               <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <span class="star-badge" style="color: #fbbf24; font-size: 1.15rem;">⭐</span>
-                <span class="kid-badge" title="הילד המנוטר">${alert.kid_name}</span>
-                ${alert.chat_name ? `<span class="group-badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.25);">💬 ${alert.chat_name}</span>` : ''}
+                <span class="kid-badge" title="הילד המנוטר">${esc(alert.kid_name)}</span>
+                ${alert.chat_name ? `<span class="group-badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.25);">💬 ${esc(alert.chat_name)}</span>` : ''}
               </div>
               <span class="alert-time">${timeStr}</span>
             </div>
             <div class="alert-body">
               <div style="margin-bottom: 0.65rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
                 <span>נכתב על ידי:</span>
-                <strong style="color: var(--text-main); font-weight: 700;">${alert.sender || 'לא ידוע'}</strong>
+                <strong style="color: var(--text-main); font-weight: 700;">${esc(alert.sender || 'לא ידוע')}</strong>
                 ${isOutgoing ? `<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-right: 0.25rem;">מכשיר הילד</span>` : ''}
               </div>
               <div class="alert-time">הודעה שסומנה:</div>
-              <div class="target-message">"${alert.target_text}"</div>
+              <div class="target-message">"${esc(alert.target_text)}"</div>
               ${alert.explanation_hebrew ? `
                 <div class="explanation-box">
                   <span>💡</span>
-                  <span><strong>ניתוח AI וסיבת השמירה:</strong> ${alert.explanation_hebrew}</span>
+                  <span><strong>ניתוח AI וסיבת השמירה:</strong> ${esc(alert.explanation_hebrew)}</span>
                 </div>
               ` : ''}
             </div>
             <div class="alert-footer">
-              <span class="threat-tag ${alert.category}">${categoryLabel} (רמת זיהוי: ${Math.round(alert.confidence * 100)}%)</span>
-              <button class="context-btn" onclick="openContextModal('${alertIdentifier}')">הצג שיחה מלאה</button>
+              <span class="threat-tag ${catClass(alert.category)}">${esc(categoryLabel)} (רמת זיהוי: ${Math.round(alert.confidence * 100)}%)</span>
+              <button class="context-btn" data-id="${esc(alertIdentifier)}" onclick="openContextModal(this.dataset.id)">הצג שיחה מלאה</button>
             </div>
             <div class="alert-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; border-top: 1px dashed var(--card-border); padding-top: 0.75rem;">
-              <button onclick="unsaveAlert('${alertIdentifier}')" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🔓 הסר משמורות</button>
-              <button onclick="deleteAlert('${alertIdentifier}')" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🗑️ מחק לצמיתות</button>
+              <button data-id="${esc(alertIdentifier)}" onclick="unsaveAlert(this.dataset.id)" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🔓 הסר משמורות</button>
+              <button data-id="${esc(alertIdentifier)}" onclick="deleteAlert(this.dataset.id)" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit;">🗑️ מחק לצמיתות</button>
             </div>
           </div>
         `;
@@ -1117,7 +1136,7 @@
         });
         if (res.ok) {
           showToastMsg("ההתרעה הוסרה מהרשימה השמורה.");
-          loadAlerts();
+          loadAlerts(true);
         }
       } catch (err) {
         console.error("Failed to unsave alert:", err);
@@ -1140,7 +1159,7 @@
       const container = document.getElementById('keywords-list');
       container.innerHTML = keywords.map((word, idx) => `
         <div class="keyword-chip">
-          <span>${word}</span>
+          <span>${esc(word)}</span>
           <button class="remove-keyword" onclick="removeKeyword(${idx})">×</button>
         </div>
       `).join('');
@@ -1193,7 +1212,7 @@
         });
         if (res.ok) {
           showToastMsg("ההתרעה נמחקה בהצלחה.");
-          loadAlerts();
+          loadAlerts(true);
         }
       } catch (err) {
         console.error("Failed to delete alert:", err);
@@ -1209,7 +1228,7 @@
         });
         if (res.ok) {
           showToastMsg("סומן כהתרעת שווא. ה-AI לומד את התיקון!");
-          loadAlerts();
+          loadAlerts(true);
         }
       } catch (err) {
         console.error("Failed to dismiss alert:", err);
@@ -1229,7 +1248,7 @@
         if (res.ok) {
           showToastMsg(`הילד "${currentKidFilter}" והתרעותיו הוסרו מהניטור בהצלחה.`);
           currentKidFilter = 'all';
-          loadAlerts();
+          loadAlerts(true);
         }
       } catch (err) {
         console.error("Failed to delete kid:", err);
@@ -1290,7 +1309,7 @@
           showToastMsg(`${selectedAlertIds.length} התרעות נשמרו בהצלחה.`);
           selectedAlertIds = [];
           document.getElementById('bulk-actions-panel').style.display = 'none';
-          loadAlerts();
+          loadAlerts(true);
         }
       } catch (err) {
         console.error("Failed to bulk save alerts:", err);
@@ -1311,7 +1330,7 @@
           showToastMsg(`${selectedAlertIds.length} התרעות נמחקו בהצלחה.`);
           selectedAlertIds = [];
           document.getElementById('bulk-actions-panel').style.display = 'none';
-          loadAlerts();
+          loadAlerts(true);
         }
       } catch (err) {
         console.error("Failed to bulk delete alerts:", err);
@@ -1330,7 +1349,7 @@
           showToastMsg(`נמחקו ${data.count} התרעות שאינן שמורות.`);
           selectedAlertIds = [];
           document.getElementById('bulk-actions-panel').style.display = 'none';
-          loadAlerts();
+          loadAlerts(true);
         }
       } catch (err) {
         console.error("Failed to delete unsaved alerts:", err);
@@ -1348,8 +1367,31 @@
     }
 
     // Auto load feed
-    loadAlerts();
-    setInterval(loadAlerts, 4000); // refresh every 4 seconds
+    loadAlerts(true);
+    setInterval(() => { if (!document.hidden) loadAlerts(false); }, 15000); // cheap version check every 15s while visible
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadAlerts(false); });
+
+    // Server status line + Telegram test
+    async function loadStatus() {
+      try {
+        const st = await (await fetch('/api/status')).json();
+        const parts = [];
+        parts.push(st.database === 'firestore' ? '🗄️ מסד נתונים: תקין' : '⚠️ מסד נתונים זמני (הנתונים יימחקו באיתחול)');
+        parts.push(st.ai.lastError && (!st.ai.lastOk || st.ai.lastErrorAt > st.ai.lastOk) ? '⚠️ ניתוח AI: שגיאה אחרונה - ' + st.ai.lastError : '🤖 ניתוח AI: ' + (st.ai.model || 'טרם הופעל'));
+        parts.push(st.telegram ? '📨 טלגרם: מוגדר' : '📨 טלגרם: לא מוגדר');
+        if (!st.auth.dashboard || !st.auth.device) parts.push('⚠️ אבטחה: סיסמה/טוקן לא מוגדרים בשרת');
+        document.getElementById('status-line').innerText = parts.join('  |  ');
+        document.getElementById('test-telegram-btn').style.display = st.telegram ? 'inline-block' : 'none';
+      } catch (e) {}
+    }
+    async function sendTestNotification() {
+      try {
+        const res = await fetch('/api/test-notification', { method: 'POST' });
+        showToastMsg(res.ok ? 'נשלחה הודעת בדיקה לטלגרם' : 'שליחת הודעת הבדיקה נכשלה');
+      } catch (e) { showToastMsg('שליחת הודעת הבדיקה נכשלה'); }
+    }
+    loadStatus();
+    setInterval(loadStatus, 5 * 60 * 1000);
   </script>
 </body>
 </html>
