@@ -10,6 +10,7 @@ function getModelCandidates() {
   if (process.env.GEMINI_MODEL) candidates.push({ model: process.env.GEMINI_MODEL.trim() });
   candidates.push({ model: 'gemini-3.5-flash', thinking: { thinkingLevel: 'minimal' } });
   candidates.push({ model: 'gemini-2.5-flash', thinking: { thinkingBudget: 0 } });
+  candidates.push({ model: 'gemini-2.5-flash-lite', thinking: { thinkingBudget: 0 } });
   const seen = new Set();
   return candidates.filter(c => (seen.has(c.model) ? false : seen.add(c.model)));
 }
@@ -105,9 +106,11 @@ ${fence(targetText, 1500)}
 החזר אובייקט JSON בלבד לפי הסכמה: is_threat, category (physical_violence / cyberbullying / self_harm / none), confidence (0.0-1.0), explanation_hebrew (הסבר קצר בעברית).`;
 }
 
-function isModelMissingError(err) {
-  const msg = String((err && (err.message || err.status)) || '');
-  return /404|NOT_FOUND|no longer available|not found/i.test(msg);
+// Errors that are specific to one model/billing tier: trying the next candidate model may succeed.
+// (404 = model retired, 402/403 = no credits / no access, 429 = quota exhausted for that model.)
+function shouldTryNextModel(err) {
+  const msg = String((err && (err.message || err.status || err.code)) || '');
+  return /\b(402|403|404|429)\b|NOT_FOUND|no longer available|not found|credits|billing|quota|RESOURCE_EXHAUSTED|PERMISSION_DENIED/i.test(msg);
 }
 
 function failure(message) {
@@ -192,7 +195,7 @@ async function analyzeHebrewText(targetText, contextLines, db, kidName) {
       } catch (err) {
         lastErr = err;
         console.error(`Gemini error (${candidate.model}, attempt ${attempt}):`, String(err && err.message).slice(0, 300));
-        if (isModelMissingError(err)) break; // go to next candidate model
+        if (shouldTryNextModel(err)) break; // go to next candidate model
         if (attempt < 2) await new Promise(r => setTimeout(r, 1500));
       }
     }
